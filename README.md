@@ -1,7 +1,8 @@
 # OPL3 emulator
 
 OPL3 emulator usable as a CLI tool or as a library.
-Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozendey.com/)
+
+Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozendey.com/).
 
 ## Using from command line
 
