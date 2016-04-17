@@ -1,13 +1,14 @@
 # OPL3 emulator
 
-OPL3 emulator usable as a CLI tool or as a library
+OPL3 emulator usable as a CLI tool or as a library.
+Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozendey.com/)
 
 ## Using from command line
 
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.1.2
+OPL3 emulator v0.1.3
 Usage: opl3 [OPTIONS] <input file>
 
 Options:
