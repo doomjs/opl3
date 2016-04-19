@@ -4,7 +4,7 @@ module.exports = {
         LAA: require('./format/laa'),
         MUS: require('./format/mus')
     },
-    WAV: require('./wav'),
+    WAV: require('./wav').WAV,
     Player: function Player(format, options){
         this.load = function(buffer, callback, postMessage){
             try{
@@ -29,7 +29,7 @@ module.exports = {
                     dlen += d;
 
                     postMessage({ cmd: 'position', samples: len, duration: dlen });
-                    postMessage({ cmd: 'progress', value: Math.floor(player.position / player.data.length * 1000) / 10 });
+                    postMessage({ cmd: 'progress', value: Math.floor(player.position / player.data.byteLength * 1000) / 10 });
 
                     var arr = new Int16Array((n / 2) | 0);
                     for (var i = 0, j = 0; i < n; i += 4, j += 2){
@@ -46,6 +46,7 @@ module.exports = {
                 postMessage({ cmd: 'progress', value: 100 });
                 if (typeof callback == 'function') callback(null, writer.getContents());
             }catch(err){
+                console.error(err);
                 if (typeof callback == 'function') callback(err, null);
             }
         };

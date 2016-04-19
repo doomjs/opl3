@@ -10,19 +10,23 @@ module.exports = MUS;
 extend(MUS.prototype, {
     adlib_opadd: [0x00, 0x01, 0x02, 0x08, 0x09, 0x0A, 0x10, 0x11, 0x12, 0x100, 0x101, 0x102, 0x108, 0x109, 0x10a, 0x110, 0x111, 0x112],
     maxVoice: 18,
+    MUS: [0x4d, 0x55, 0x53],
     load: function(buffer){
-        if (!(buffer instanceof Buffer)) buffer = new Buffer(buffer);
+        this.data = new DataView(buffer.buffer || buffer);
 
-        if (buffer.toString(0, 3) != 'MUS' && buffer.byteAt(3) != 0x1a) throw new Error('Buffer is not a MUS file');
-        this.scoreLength = buffer.wordAt(4, true);
-        this.scoreStart = buffer.wordAt(6, true);
-        this.channelCount = buffer.wordAt(8, true);
-        this.secondaryChannels = buffer.wordAt(10, true);
-        this.instrumentsCount = buffer.wordAt(12, true);
+        if (this.data.getUint8(0) != this.MUS[0] ||
+            this.data.getUint8(1) != this.MUS[1] ||
+            this.data.getUint8(2) != this.MUS[2] ||
+            this.data.getUint8(3) != 0x1a) throw new Error('Buffer is not a MUS file');
+        this.scoreLength = this.data.getUint16(4, true);
+        this.scoreStart = this.data.getUint16(6, true);
+        this.channelCount = this.data.getUint16(8, true);
+        this.secondaryChannels = this.data.getUint16(10, true);
+        this.instrumentsCount = this.data.getUint16(12, true);
 
         this.channelInstruments = [];
         for (var i = 0, j = 16; i < this.instrumentsCount; i++, j += 2){
-            this.channelInstruments.push(buffer.wordAt(j, true));
+            this.channelInstruments.push(this.data.getUint16(j, true));
         }
 
         this.channels = [];
@@ -32,7 +36,6 @@ extend(MUS.prototype, {
         this.channels[15] = new MUSChannel();
 
         this.position = 0;
-        this.data = buffer.data;
 
         this.voices = [];
         for (var i = 0; i < this.maxVoice; i++){
@@ -42,31 +45,29 @@ extend(MUS.prototype, {
         }
 
         this.rewind();
-        console.log(this);
     },
     update: function(){
-        if (this.position >= this.data.length){
-            console.log('unexpected end');
+        if (this.position >= this.data.byteLength){
             return false;
         }
 
         var last = 0;
         while (!last){
-            var event = this.data[this.position++];
+            var event = this.data.getUint8(this.position++);
             var channel = event & 0xf;
             var type = (event & 0x70) >> 4;
             last = event & 0x80;
 
             switch (type){
                 case 0: //release note
-                    var note = this.data[this.position++] & 0x7f;
+                    var note = this.data.getUint8(this.position++) & 0x7f;
 
                     if (channel == 15){
                         var percNote = note - 35 + 128;
                         if (this.instruments[percNote]){
                             note = this.instruments[percNote].fixedNote;
                         }else{
-                            console.log('percussion instrument missing on release note', note, percNote);
+                            //console.log('percussion instrument missing on release note', note, percNote);
                             break;
                         }
                     }
@@ -80,11 +81,11 @@ extend(MUS.prototype, {
                     }
                     break;
                 case 1: //play note
-                    var data = this.data[this.position++];
+                    var data = this.data.getUint8(this.position++);
                     var note = data & 0x7f;
                     var vel = this.channels[channel].velocity;
                     if (data & 0x80){
-                        this.channels[channel].velocity = vel = this.data[this.position++] & 0x7f;
+                        this.channels[channel].velocity = vel = this.data.getUint8(this.position++) & 0x7f;
                     }
 
                     if (channel == 15){
@@ -93,7 +94,7 @@ extend(MUS.prototype, {
                             this.channels[channel].instrument = this.instruments[percNote];
                             note = this.instruments[percNote].fixedNote;
                         }else{
-                            console.log('percussion instrument missing on play note', note, percNote);
+                            //console.log('percussion instrument missing on play note', note, percNote);
                             break;
                         }
                     }
@@ -103,7 +104,7 @@ extend(MUS.prototype, {
                     this.playVoice(on, channel, inst, inst.voices[0], note + inst.voices[0].baseNoteOffset, vel);
                     break;
                 case 2: //pitch wheel
-                    var pitch = this.data[this.position++];
+                    var pitch = this.data.getUint8(this.position++);
                     this.channels[channel].pitch = pitch;
                     for (var i = 0; i < this.maxVoice; i++){
                         var voice = this.voices[i];
@@ -114,21 +115,21 @@ extend(MUS.prototype, {
                     }
                     break;
                 case 3: //system event
-                    var number = this.data[this.position++] & 0x7f;
-                    console.log('system event', channel, number);
+                    var number = this.data.getUint8(this.position++) & 0x7f;
+                    //console.log('system event', channel, number);
                     break;
                 case 4: //change controller
-                    var ctrl = this.data[this.position++] & 0x7f;
-                    var value = this.data[this.position++] & 0x7f;
+                    var ctrl = this.data.getUint8(this.position++) & 0x7f;
+                    var value = this.data.getUint8(this.position++) & 0x7f;
                     switch (ctrl){
                         case 0: //instrument number
                             this.channels[channel].instrument = this.instruments[value];
                             break;
                         case 1: //bank select
-                            console.log('bank select', channel, value);
+                            //console.log('bank select', channel, value);
                             break;
                         case 2: //modulation pot
-                            console.log('modulation pot', channel, value);
+                            //console.log('modulation pot', channel, value);
                             break;
                         case 3: //volume
                             this.channels[channel].volume = value;
@@ -142,30 +143,30 @@ extend(MUS.prototype, {
                             break;
                         case 4: //panning
                             this.channels[channel].panning = value;
-                            console.log('set panning', channel, value);
+                            //console.log('set panning', channel, value);
                             break;
                         case 5: //expression pot
-                            console.log('expression pot', channel, value);
+                            //console.log('expression pot', channel, value);
                             break;
                         case 6: //reverb depth
-                            console.log('reverb depth', channel, value);
+                            //console.log('reverb depth', channel, value);
                             break;
                         case 7: //chorus depth
-                            console.log('chorus depth', channel, value);
+                            //console.log('chorus depth', channel, value);
                             break;
                         case 8: //sustain pedal
-                            console.log('sustain pedal', channel, value);
+                            //console.log('sustain pedal', channel, value);
                             break;
                         case 9: //soft pedal
-                            console.log('soft pedal', channel, value);
+                            //console.log('soft pedal', channel, value);
                             break;
                         default:
-                            console.log('unknown controller', channel, ctrl, value);
+                            //console.log('unknown controller', channel, ctrl, value);
                             break;
                     }
                     break;
                 case 6: //score end
-                    console.log('score end', this.maxVoiceOn);
+                    //console.log('score end', this.maxVoiceOn);
                     for (var i = 0; i < this.maxVoice; i++){
                         if (this.voices[i].channel > 0){
                             this.midi_fm_endnote(i);
@@ -178,17 +179,17 @@ extend(MUS.prototype, {
 
         var time = 0;
         while (true){
-            var byte = this.data[this.position++];
+            var byte = this.data.getUint8(this.position++);
             time = time * 128 + (byte & 0x7f);
             if (!(byte & 0x80)) break;
         }
 
-        this.wait = time * 140;
+        this.wait = time * 1 / 140;
 
         return true;
     },
     refresh: function(){
-        return Math.min(this.wait, 100);
+        return this.wait > 0.01 ? this.wait : 0.01; 
     },
     rewind: function(){
         this.position = this.scoreStart;
