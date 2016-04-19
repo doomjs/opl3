@@ -41,6 +41,8 @@ extend(LAA.prototype, {
     fnums: [0x16b, 0x181, 0x198, 0x1b0, 0x1ca, 0x1e5, 0x202, 0x220, 0x241, 0x263, 0x287, 0x2ae],
     percussion_map: [6, 7, 8, 8, 7],
     load: function(buffer){
+        if (!(buffer instanceof Uint8Array)) buffer = new Uint8Array(buffer);
+        
         this.position = 0;
         if (buffer[0] == this.ADL[0] && buffer[1] == this.ADL[1] && buffer[2] == this.ADL[2]){
             this.type = this.FILE_LUCAS;
@@ -59,12 +61,12 @@ extend(LAA.prototype, {
         if (this.doing == 1){
             for (var curtrack = 0; curtrack < 16; curtrack++){
                 if (this.tracks[curtrack].on != 0){
-                    this.pos = this.tracks[curtrack].pos;
+                    this.position = this.tracks[curtrack].pos;
 
                     if (this.type != this.FILE_SIERRA && this.type != this.FILE_ADVSIERRA) this.tracks[curtrack].iwait += this.getval();
                     else this.tracks[curtrack].iwait += this.getnext(1);
 
-                    this.tracks[curtrack].pos = this.pos;
+                    this.tracks[curtrack].pos = this.position;
                 }
             }
 
@@ -77,12 +79,12 @@ extend(LAA.prototype, {
         while (this.iwait == 0 && ret == 1){
             for (var curtrack = 0; curtrack < 16; curtrack++){
                 if (this.tracks[curtrack].on != 0 && this.tracks[curtrack].iwait == 0 && this.tracks[curtrack].pos < this.tracks[curtrack].tend){
-                    this.pos = this.tracks[curtrack].pos;
+                    this.position = this.tracks[curtrack].pos;
                     var v = this.getnext(1);
 
                     if (v < 0x80){
                         v = this.tracks[curtrack].pv;
-                        this.pos--;
+                        this.position--;
                     }
                     this.tracks[curtrack].pv = v;
 
@@ -169,7 +171,7 @@ extend(LAA.prototype, {
                                         this.chp[on][2] = 0;
                                     }
                                 }
-                            }else console.error('channel off', c, this.pos);
+                            }else console.error('channel off', c, this.position);
 
                             break;
                         case 0xa0: //key after touch
@@ -210,9 +212,9 @@ extend(LAA.prototype, {
                                 case 0xf7: //sysex
                                     var l = this.getval();
                                     var t = 0;
-                                    if (this.datalook(this.pos + l) == 0xf7) t = 1;
+                                    if (this.datalook(this.position + l) == 0xf7) t = 1;
 
-                                    if (this.datalook(this.pos) == 0x7d && this.datalook(this.pos + 1) == 0x10 && this.datalook(this.pos + 2) < 16){
+                                    if (this.datalook(this.position) == 0x7d && this.datalook(this.position + 1) == 0x10 && this.datalook(this.position + 2) < 16){
                                         this.adlib_style = this.LUCAS_STYLE | this.MIDI_STYLE;
 
                                         this.getnext(1);
@@ -257,7 +259,7 @@ extend(LAA.prototype, {
                                 case 0xfc:
                                     //this ends the track for sierra.
                                     if (this.type == this.FILE_SIERRA || this.type == this.FILE_ADVSIERRA){
-                                        this.tracks[curtrack].tend = this.pos;
+                                        this.tracks[curtrack].tend = this.position;
                                     }
                                     break;
                                 case 0xfe: break;
@@ -277,11 +279,11 @@ extend(LAA.prototype, {
                         default: console.error('!', v); // if we get down here, a error occurred
                     }
 
-                    if (this.pos < this.tracks[curtrack].tend){
+                    if (this.position < this.tracks[curtrack].tend){
                         this.tracks[curtrack].iwait = this.type != this.FILE_SIERRA && this.type != this.FILE_ADVSIERRA ? this.getval() : this.getnext(1);
                     }else this.tracks[curtrack].iwait = 0;
 
-                    this.tracks[curtrack].pos = this.pos;
+                    this.tracks[curtrack].pos = this.position;
                 }
             }
 
@@ -315,7 +317,7 @@ extend(LAA.prototype, {
     	return ret != 0;
     },
     rewind: function(subsong){
-        this.pos = 0;
+        this.position = 0;
         this.tins = 0;
 
         this.adlib_style = this.MIDI_STYLE | this.CMF_STYLE;
@@ -364,7 +366,7 @@ extend(LAA.prototype, {
         }
 
         this.curtrack = 0;
-        this.pos = 0;
+        this.position = 0;
 
         var n = this.getnext(1);
         switch (this.type){
@@ -381,7 +383,7 @@ extend(LAA.prototype, {
                 var track = this.tracks[0];
                 track.on = 1;
                 track.tend = this.getnext(4);
-                track.spos = this.pos;
+                track.spos = this.position;
                 break;
         }
 
@@ -400,14 +402,14 @@ extend(LAA.prototype, {
         return Math.min(this.fwait, 100);
     },
     datalook: function(pos){
-        return this.pos < 0 || this.pos >= this.data.length ? 0 : this.data[pos];
+        return this.position < 0 || this.position >= this.data.length ? 0 : this.data[pos];
     },
     getnexti: function(num){
         var v = 0;
 
         for (var i = 0; i < num; i++){
-            v += (this.datalook(this.pos) << (8 * i));
-            this.pos++;
+            v += (this.datalook(this.position) << (8 * i));
+            this.position++;
         }
 
         return v;
@@ -417,8 +419,8 @@ extend(LAA.prototype, {
 
         for (var i = 0; i < num; i++){
             v <<= 8;
-            v += this.datalook(this.pos);
-            this.pos++;
+            v += this.datalook(this.position);
+            this.position++;
         }
 
         return v;

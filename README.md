@@ -9,7 +9,7 @@ Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozen
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.1.3
+OPL3 emulator v0.1.4
 Usage: opl3 [OPTIONS] <input file>
 
 Options:
@@ -31,26 +31,28 @@ Copyright (c) 2016 IDDQD@doom.js
 Use OPL3 and a format handler (like LAA) to process:
 
 ```javascript
+var fs = require('fs');
+
 var OPL3 = require('opl3').OPL3;
 var LAA = require('opl3').format.LAA;
+var Player = require('opl3').Player;
+var WAV = require('opl3').WAV;
 
-var player = new LAA(new OPL3(2));
-player.load(new Uint8Array(buffer));
-
-var len = 0;
-var dlen = 0;
-while (player.update()){
-    var d = player.refresh();
-    var n = 4 * ((49700 * d) | 0);
-
-    len += n;
-    dlen += d;
-
-    var arr = new Int16Array((n / 2) | 0);
-    for (var i = 0, j = 0; i < n; i += 4, j += 2){
-        arr.set(player.opl.read(), j);
-    }
-
-    // use arr buffer data
-}
+var player = new Player(LAA);
+player.load(fs.readFileSync('./laa/dott logo.laa'), function(err, result){
+    if (err) return console.log(err);
+    fs.writeFileSync('./dott.wav', new Buffer(WAV(result, 49700)));
+    console.log('done!');
+}, function(msg){
+    // msg format:
+    // { cmd: 'position', samples: 0 /* bytes */, duration: 0 /* seconds */ }
+    // { cmd: 'progress', value: 100 /* percent */ }
+    // { cmd: 'end' }
+    process.stdout.write('.');
+});
 ```
+
+## Supported format types
+
+* LAA: LucasArts music format (used in Day of the Tentacles)
+* MUS: Doom music format
