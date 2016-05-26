@@ -9,7 +9,7 @@ Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozen
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.1.5
+OPL3 emulator v0.1.6
 Usage: opl3 [OPTIONS] <input file>
 
 Options:
