@@ -3,7 +3,7 @@ var extend = require('extend');
 function MUS(opl, instruments){
     this.opl = opl;
     this.adlib_data = new Int32Array(0x200);
-    this.instruments = instruments;
+    this.instruments = instruments || require('./genmidi.json').instruments;
 }
 module.exports = MUS;
 
