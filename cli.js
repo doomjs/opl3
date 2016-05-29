@@ -5,6 +5,8 @@ var chalk = require('chalk');
 var ProgressBar = require('progress');
 var yargs = require('yargs');
 var Duration = require('duration');
+var mkdirp = require('mkdirp');
+var path = require('path');
 
 var OPL3 = require('./opl3');
 var LAA = require('./format/laa');
@@ -12,8 +14,8 @@ var MUS = require('./format/mus');
 var WAV = require('./wav.js').WAV;
 var package = require('./package.json');
 
-var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\nUsage: opl3 [OPTIONS] <input file>')
-	.example('opl3 --mp3 ./laa/dott_logo.laa')
+var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u001b[97mUsage:\u001b[39m\u001b[49m: $0 <input file> [OPTIONS]')
+	.example('$0 ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav')
 	.describe('mp3', 'Export to MP3')
 	.describe('wav', 'Export to WAV')
 	.describe('laa', 'Use LAA format')
@@ -23,23 +25,27 @@ var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\nUs
 	.alias('h', 'help')
 	.alias('p', 'play')
 	.epilog(chalk.cyan('Copyright (c) 2016 IDDQD@doom.js'))
+	.updateStrings({
+		'Options:': '\u001b[97mOptions:\u001b[39m\u001b[49m',
+		'Examples:': '\u001b[97mExamples:\u001b[39m\u001b[49m'
+	})
 	.wrap(yargs.terminalWidth() - 1)
 	.argv;
 
 if (argv.help) yargs.showHelp();
 else{
-	
 	var start = Date.now();
 
 	console.log();
 	console.log(chalk.cyan('OPL3 emulator v' + package.version));
 	
 	if (process.argv.length < 3){
+		yargs.showHelp();
 		console.log(chalk.red('Input file required!'));
 		process.exit(1);
 	}
 	
-	var filename = process.argv[process.argv.length - 1];
+	var filename = argv._[0];
 	if (!fs.existsSync(filename)){
 		console.log(chalk.red('Input file not found!'));
 		process.exit(1);
@@ -54,14 +60,9 @@ else{
 	}
 	
 	var WritableStreamBuffer = require('stream-buffers').WritableStreamBuffer;
-	var ReadableStreamBuffer = require('stream-buffers').ReadableStreamBuffer;
 	var writer = new WritableStreamBuffer({
 		initialSize: (1024 * 1024),
 		incrementAmount: (512 * 1024)
-	});
-	var reader = new ReadableStreamBuffer({
-		frequency: 10,   // in milliseconds.
-		chunkSize: 16 * 1024  // in bytes.
 	});
 	var lame = require('lame');
 	var Speaker = require('speaker');
@@ -91,14 +92,14 @@ else{
 			outSampleRate: 22050,
 			mode: lame.STEREO // STEREO (default), JOINTSTEREO, DUALCHANNEL or MONO
 		});
-		mp3Filename = argv.mp3 == filename ? filename.slice(0, filename.lastIndexOf('.')) + '.mp3' : argv.mp3; 
+		mp3Filename = typeof argv.mp3 != 'string' ? filename.slice(0, filename.lastIndexOf('.')) + '.mp3' : argv.mp3;
+		mkdirp.sync(path.dirname(mp3Filename));
 		var mp3file = fs.createWriteStream(mp3Filename);
-		reader.pipe(encoder);
 		encoder.pipe(mp3file);
 	}
 
 	var buffer = fs.readFileSync(filename);
-	var bar = new ProgressBar('Processing ' + chalk.yellow(process.argv[process.argv.length - 1]) + ' [:bar] :percent :etas', {
+	var bar = new ProgressBar('Processing ' + chalk.yellow(filename) + ' [:bar] :percent :etas', {
 		width: 20,
 		total: buffer.length
 	});
@@ -115,7 +116,7 @@ else{
 		var d = player.refresh();
 		var n = 4 * ((49700 * d) | 0);
 
-		bar.tick(player.pos - pos);
+		bar.update(player.position / buffer.length);
 		pos = player.pos;
 
 		len += n;
@@ -127,22 +128,23 @@ else{
 		}
 
 		var buf = new Buffer(arr.buffer);
-		reader.put(buf);
 		writer.write(buf);
 		if (argv.play) speaker.write(buf);
 	}
 
-	reader.stop();
 	writer.end();
 	if (argv.play) speaker.end();
 
 	var processBuffer = writer.getContents();
 	
 	var exportWav = function(){
-		if (!argv.mp3) console.log();
-		var wavFilename = argv.wav == filename || typeof argv.wav != 'string' ? filename.slice(0, filename.lastIndexOf('.')) + '.wav' : argv.wav;
-		fs.writeFileSync(wavFilename, new Buffer(WAV(processBuffer, 49700)));
-		console.log('WAV exported to ' + chalk.yellow(wavFilename));
+		if (argv.wav){
+			if (!argv.mp3) console.log();
+			var wavFilename = typeof argv.wav != 'string' ? filename.slice(0, filename.lastIndexOf('.')) + '.wav' : argv.wav;
+			mkdirp.sync(path.dirname(wavFilename));
+			fs.writeFileSync(wavFilename, new Buffer(WAV(processBuffer, 49700)));
+			console.log('WAV exported to ' + chalk.yellow(wavFilename));
+		}
 		console.log('Finished in ' + chalk.yellow(new Duration(new Date(0), new Date(Date.now() - start)).toString('%S.%L') + 's'));
 		if (argv.play) console.log(chalk.magenta('Playing audio...'));
 		
@@ -155,10 +157,17 @@ else{
 			width: 20,
 			total: processBuffer.length
 		});
+		fs.writeFileSync(mp3Filename + '.tmp', processBuffer, 'binary');
+		var reader = fs.createReadStream(mp3Filename + '.tmp');
+		reader.pipe(encoder);
+		
 		reader.on('data', function(chunk){
 			mp3bar.tick(chunk.length);
 		});
-		reader.on('end', exportWav);
+		reader.on('end', function(){
+			fs.unlinkSync(mp3Filename + '.tmp');
+			exportWav();
+		});
 	}else exportWav();
 
 }

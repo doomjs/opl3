@@ -9,8 +9,8 @@ Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozen
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.1.6
-Usage: opl3 [OPTIONS] <input file>
+OPL3 emulator v0.1.7
+Usage:: cli.js <input file> [OPTIONS]
 
 Options:
   --mp3       Export to MP3
@@ -21,7 +21,7 @@ Options:
   -p, --play  Play after processing
 
 Examples:
-  opl3 --mp3 ./laa/dott_logo.laa
+  cli.js ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav
 
 Copyright (c) 2016 IDDQD@doom.js
 ```

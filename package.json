@@ -1,11 +1,11 @@
 {
   "name": "opl3",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "OPL3 emulator library",
   "main": "index.js",
   "preferGlobal": true,
   "bin": {
-      "opl3": "cli.js"
+    "opl3": "cli.js"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -33,6 +33,7 @@
     "duration": "^0.2.0",
     "extend": "^3.0.0",
     "lame": "^1.2.3",
+    "mkdirp": "^0.5.1",
     "progress": "^1.1.8",
     "speaker": "^0.3.0",
     "stream-array": "^1.1.1",
