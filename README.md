@@ -9,22 +9,26 @@ Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozen
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.1.7
-Usage:: cli.js <input file> [OPTIONS]
+OPL3 emulator v0.2.0
+Usage:: opl3 <input file> [OPTIONS]
 
 Options:
-  --mp3       Export to MP3
-  --wav       Export to WAV
-  --laa       Use LAA format
-  --mus       Use MUS format
-  -h, --help  You read that just now
-  -p, --play  Play after processing
+  --mp3         Export to MP3
+  --wav         Export to WAV
+  --ogg         Export to OGG
+  --laa         Use LAA format
+  --mus         Use MUS format
+  -h, --help    You read that just now
+  -p, --play    Play after processing
+  -o, --output  Output directory
 
 Examples:
-  cli.js ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav
+  opl3 ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav --ogg dott_logo.ogg
 
 Copyright (c) 2016 IDDQD@doom.js
 ```
+
+Accepts glob patterns as input file, like ```opl3 **/*.mus```.
 
 ## Using from JavaScript
 
@@ -56,3 +60,10 @@ player.load(fs.readFileSync('./laa/dott logo.laa'), function(err, result){
 
 * LAA: LucasArts music format (used in Day of the Tentacles)
 * MUS: Doom music format
+
+## Supported audio export formats
+
+* WAV: PCM audio WAVE
+* MP3: using [node-lame](https://github.com/TooTallNate/node-lame)
+* OGG: using [node-vorbis](https://github.com/TooTallNate/node-vorbis) and [node-ogg](https://github.com/TooTallNate/node-ogg)
+* Audio playback: using [node-speaker](https://github.com/TooTallNate/node-speaker)

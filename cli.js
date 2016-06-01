@@ -7,6 +7,13 @@ var yargs = require('yargs');
 var Duration = require('duration');
 var mkdirp = require('mkdirp');
 var path = require('path');
+var async = require('async');
+var glob = require('glob');
+
+var lame = require('lame');
+var ogg = require('ogg');
+var vorbis = require('vorbis');
+var Speaker = require('speaker');
 
 var OPL3 = require('./opl3');
 var LAA = require('./format/laa');
@@ -15,15 +22,18 @@ var WAV = require('./wav.js').WAV;
 var package = require('./package.json');
 
 var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u001b[97mUsage:\u001b[39m\u001b[49m: $0 <input file> [OPTIONS]')
-	.example('$0 ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav')
+	.example('$0 ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav --ogg dott_logo.ogg')
 	.describe('mp3', 'Export to MP3')
 	.describe('wav', 'Export to WAV')
+	.describe('ogg', 'Export to OGG')
 	.describe('laa', 'Use LAA format')
 	.describe('mus', 'Use MUS format')
 	.describe('play', 'Play after processing')
+	.describe('output', 'Output directory')
 	.describe('help', 'You read that just now')
 	.alias('h', 'help')
 	.alias('p', 'play')
+	.alias('o', 'output')
 	.epilog(chalk.cyan('Copyright (c) 2016 IDDQD@doom.js'))
 	.updateStrings({
 		'Options:': '\u001b[97mOptions:\u001b[39m\u001b[49m',
@@ -45,129 +55,239 @@ else{
 		process.exit(1);
 	}
 	
-	var filename = argv._[0];
-	if (!fs.existsSync(filename)){
-		console.log(chalk.red('Input file not found!'));
-		process.exit(1);
+	if (!(argv.wav || argv.mp3 || argv.ogg || argv.play)){
+		argv.wav = true;
+		argv.mp3 = true;
+		argv.ogg = true;
 	}
 	
-	var midiFormat;
-	if (argv.laa || filename.split('.').pop().toLowerCase() == 'laa') midiFormat = LAA;
-	else if (argv.mus || filename.split('.').pop().toLowerCase() == 'mus') midiFormat = MUS;
-	else{
-		console.log(chalk.red('Unknown file format!'));
-		process.exit(1);
-	}
-	
-	var WritableStreamBuffer = require('stream-buffers').WritableStreamBuffer;
-	var writer = new WritableStreamBuffer({
-		initialSize: (1024 * 1024),
-		incrementAmount: (512 * 1024)
-	});
-	var lame = require('lame');
-	var Speaker = require('speaker');
-
-	// Create the Speaker instance
-	var speaker;
-	if (argv.play){
-		speaker = new Speaker({
-			channels: 2,          // 2 channels
-			bitDepth: 16,         // 16-bit samples
-			sampleRate: 49700     // 49,700 Hz sample rate
-		});
-	}
-
-	var encoder;
-	var mp3Filename;
-	if (argv.mp3){
-		// create the Encoder instance
-		encoder = new lame.Encoder({
-			// input
-			channels: 2,        // 2 channels (left and right)
-			bitDepth: 16,       // 16-bit samples
-			sampleRate: 49700,  // 49,700 Hz sample rate
-
-			// output
-			bitRate: 128,
-			outSampleRate: 22050,
-			mode: lame.STEREO // STEREO (default), JOINTSTEREO, DUALCHANNEL or MONO
-		});
-		mp3Filename = typeof argv.mp3 != 'string' ? filename.slice(0, filename.lastIndexOf('.')) + '.mp3' : argv.mp3;
-		mkdirp.sync(path.dirname(mp3Filename));
-		var mp3file = fs.createWriteStream(mp3Filename);
-		encoder.pipe(mp3file);
-	}
-
-	var buffer = fs.readFileSync(filename);
-	var bar = new ProgressBar('Processing ' + chalk.yellow(filename) + ' [:bar] :percent :etas', {
-		width: 20,
-		total: buffer.length
-	});
-
-	var player = new midiFormat(new OPL3(2));
-	player.load(new Uint8Array(buffer));
-
-	var pos = 0;
-	var len = 0;
-	var dlen = 0;
-	var streamQueue = [];
-	var streamLen = 0;
-	while (player.update()){
-		var d = player.refresh();
-		var n = 4 * ((49700 * d) | 0);
-
-		bar.update(player.position / buffer.length);
-		pos = player.pos;
-
-		len += n;
-		dlen += d;
-
-		var arr = new Int16Array((n / 2) | 0);
-		for (var i = 0, j = 0; i < n; i += 4, j += 2){
-			arr.set(player.opl.read(), j);
+	glob(argv._[0], function(err, files){
+		if (files.length < 1){
+			console.log(chalk.red('Input file not found!'));
+			process.exit(1);
 		}
-
-		var buf = new Buffer(arr.buffer);
-		writer.write(buf);
-		if (argv.play) speaker.write(buf);
-	}
-
-	writer.end();
-	if (argv.play) speaker.end();
-
-	var processBuffer = writer.getContents();
-	
-	var exportWav = function(){
-		if (argv.wav){
-			if (!argv.mp3) console.log();
-			var wavFilename = typeof argv.wav != 'string' ? filename.slice(0, filename.lastIndexOf('.')) + '.wav' : argv.wav;
-			mkdirp.sync(path.dirname(wavFilename));
-			fs.writeFileSync(wavFilename, new Buffer(WAV(processBuffer, 49700)));
-			console.log('WAV exported to ' + chalk.yellow(wavFilename));
-		}
-		console.log('Finished in ' + chalk.yellow(new Duration(new Date(0), new Date(Date.now() - start)).toString('%S.%L') + 's'));
-		if (argv.play) console.log(chalk.magenta('Playing audio...'));
 		
-		console.log();
-	};
-	
-	if (argv.mp3){
-		console.log();
-		var mp3bar = new ProgressBar('MP3 encoding ' + chalk.yellow(mp3Filename) + ' [:bar] :percent :etas', {
-			width: 20,
-			total: processBuffer.length
+		process.on('SIGINT', function(){
+			files.forEach(function(filename){
+				if (fs.existsSync(path.join(argv.output, path.basename(filename + '.tmp')))) fs.unlinkSync(path.join(argv.output, path.basename(filename + '.tmp')));
+				if (fs.existsSync(path.join(argv.output, path.basename(filename + '.tmp32')))) fs.unlinkSync(path.join(argv.output, path.basename(filename + '.tmp32')));
+			});
+			process.exit(1);
 		});
-		fs.writeFileSync(mp3Filename + '.tmp', processBuffer, 'binary');
-		var reader = fs.createReadStream(mp3Filename + '.tmp');
-		reader.pipe(encoder);
 		
-		reader.on('data', function(chunk){
-			mp3bar.tick(chunk.length);
-		});
-		reader.on('end', function(){
-			fs.unlinkSync(mp3Filename + '.tmp');
-			exportWav();
-		});
-	}else exportWav();
+		async.series(files.map(function(filename){
+			argv.output = argv.output || path.dirname(filename);
+			mkdirp.sync(argv.output);
+			
+			return function(next){
+				if (!fs.existsSync(filename)){
+					console.log(chalk.red('Input file "' + filename + '" not found!'));
+					process.exit(1);
+				}
+				
+				var midiFormat;
+				if (argv.laa || filename.split('.').pop().toLowerCase() == 'laa') midiFormat = LAA;
+				else if (argv.mus || filename.split('.').pop().toLowerCase() == 'mus') midiFormat = MUS;
+				else{
+					console.log(chalk.red('Unknown file format!'));
+					process.exit(1);
+				}
+				
+				var WritableStreamBuffer = require('stream-buffers').WritableStreamBuffer;
+				var bufferWriter = new WritableStreamBuffer({
+					initialSize: (1024 * 1024),
+					incrementAmount: (512 * 1024)
+				});
+				var len = 0;
+				var tasks = [];
+				tasks.push(function(callback){
+					fs.readFile(filename, function(err, buffer){
+						var bar = new ProgressBar('Processing ' + chalk.yellow(filename) + ' [:bar] :percent :etas', {
+							width: 20,
+							total: buffer.length
+						});
+						
+						var writer = fs.createWriteStream(path.join(argv.output, path.basename(filename + '.tmp')));
+						var writer32 = fs.createWriteStream(path.join(argv.output, path.basename(filename + '.tmp32')));
+						
+						var player = new midiFormat(new OPL3(2));
+						player.load(new Uint8Array(buffer));
+						
+						var dlen = 0;
+						var fn = function(){
+							var start = Date.now();
+							while (player.update()){
+								var d = player.refresh();
+								var n = 4 * ((49700 * d) | 0);
 
+								bar.update(player.position / buffer.length);
+
+								len += n;
+								dlen += d;
+
+								var b16 = new Int16Array((n / 2) | 0);
+								for (var i = 0, j = 0; i < n; i += 4, j += 2){
+									b16.set(player.opl.read(), j);
+								}
+
+								var b32 = new Float32Array(b16.length);
+								for (var i = 0; i < b16.length; i++){
+									b32[i] = b16[i] / 32768 * 4; //TODO: normalize
+								}
+								
+								bufferWriter.write(new Buffer(b16.buffer));
+								writer.write(new Buffer(b16.buffer));
+								writer32.write(new Buffer(b32.buffer));
+								
+								if (Date.now() - start > 100) return setImmediate(fn);
+							}
+							
+							bar.update(1);
+						
+							bufferWriter.end();
+							writer.end();
+							writer32.end();
+							
+							callback();
+						};
+						
+						fn();
+					});
+				});
+				
+				if (argv.wav){
+					tasks.push(function(callback){
+						var wavFilename = typeof argv.wav != 'string' ? path.join(argv.output, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.wav')) : argv.wav;
+						mkdirp.sync(path.dirname(wavFilename));
+						
+						fs.writeFile(wavFilename, new Buffer(WAV(bufferWriter.getContents(), 49700)), function(err){
+							console.log('WAV exported to ' + chalk.yellow(wavFilename));
+							callback();
+						});
+					});
+				}
+				
+				if (argv.mp3){
+					tasks.push(function(callback){
+						var bar = new ProgressBar('Encoding ' + chalk.yellow(filename) + ' to MP3/Lame [:bar] :percent :etas', {
+							width: 20,
+							total: 100
+						});
+						
+						var encoder = new lame.Encoder({
+							// input
+							channels: 2,        // 2 channels (left and right)
+							bitDepth: 16,       // 16-bit samples
+							sampleRate: 49700,  // 49,700 Hz sample rate
+
+							// output
+							bitRate: 128,
+							outSampleRate: 22050,
+							mode: lame.STEREO // STEREO (default), JOINTSTEREO, DUALCHANNEL or MONO
+						});
+						
+						var mp3Filename = typeof argv.mp3 != 'string' ? path.join(argv.output, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mp3')) : argv.mp3;
+						mkdirp.sync(path.dirname(mp3Filename));
+						
+						var writer = fs.createWriteStream(mp3Filename);
+						var reader = fs.createReadStream(path.join(argv.output, path.basename(filename + '.tmp')));
+						
+						reader.pipe(encoder);
+						encoder.pipe(writer);
+						
+						var pos = 0;
+						reader.on('data', function(chunk){
+							pos += chunk.length;
+							bar.update(pos / len);
+						});
+						reader.on('end', function(){
+							encoder.end();
+							callback();
+						});
+						reader.on('error', function(err){
+							console.log(chalk.red('Failed to export ' + mp3Filename));
+							callback(err);
+						});
+					});
+				}
+				
+				if (argv.ogg){
+					tasks.push(function(callback){
+						var bar = new ProgressBar('Encoding ' + chalk.yellow(filename) + ' to OGG/Vorbis [:bar] :percent :etas', {
+							width: 20,
+							total: 100
+						});
+						
+						var oe = new ogg.Encoder();
+						var ve = new vorbis.Encoder({
+							sampleRate: 49700
+						});
+						
+						var oggFilename = typeof argv.ogg != 'string' ? path.join(argv.output, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.ogg')) : argv.ogg;
+						mkdirp.sync(path.dirname(oggFilename));
+						
+						var writer = fs.createWriteStream(oggFilename);
+						var reader = fs.createReadStream(path.join(argv.output, path.basename(filename + '.tmp32')));
+						
+						reader.pipe(ve);
+						ve.pipe(oe.stream());
+						oe.pipe(writer);
+						
+						var pos = 0;
+						reader.on('data', function(chunk){
+							pos += chunk.length;
+							bar.update(pos / (len * 2));
+						});
+						reader.on('end', function(){
+							callback();
+						});
+						reader.on('error', function(err){
+							console.log(chalk.red('Failed to export ' + oggFilename));
+							callback(err);
+						});
+					});
+				}
+				
+				if (argv.play){
+					tasks.push(function(callback){
+						var bar = new ProgressBar(chalk.magenta('Playing audio ') + chalk.yellow(filename) + ' [:bar] :percent :etas', {
+							width: 20,
+							total: 100
+						});
+					
+						speaker = new Speaker({
+							channels: 2,          // 2 channels
+							bitDepth: 16,         // 16-bit samples
+							sampleRate: 49700     // 49,700 Hz sample rate
+						});
+						
+						var reader = fs.createReadStream(path.join(argv.output, path.basename(filename + '.tmp')));
+						reader.pipe(speaker);
+						
+						var pos = 0;
+						reader.on('data', function(chunk){
+							pos += chunk.length;
+							bar.update(pos / len);
+						});
+						reader.on('end', function(){
+							speaker.end();
+							callback();
+						});
+						reader.on('error', function(err){
+							console.log(chalk.red('Failed to play ' + filename));
+							callback(err);
+						});
+					});
+				}
+
+				async.series(tasks, function(err){
+					if (fs.existsSync(path.join(argv.output, path.basename(filename + '.tmp')))) fs.unlink(path.join(argv.output, path.basename(filename + '.tmp')));
+					if (fs.existsSync(path.join(argv.output, path.basename(filename + '.tmp32')))) fs.unlink(path.join(argv.output, path.basename(filename + '.tmp32')));
+					next(err);
+				});
+			};
+		}), function(){
+			console.log('Finished in ' + chalk.green(new Duration(new Date(0), new Date(Date.now() - start)).toString('%S.%L') + 's'));
+		});
+	});
 }
