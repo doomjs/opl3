@@ -1,6 +1,6 @@
 {
   "name": "opl3",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "OPL3 emulator library",
   "main": "index.js",
   "preferGlobal": true,
@@ -41,7 +41,7 @@
     "speaker": "^0.3.0",
     "stream-array": "^1.1.1",
     "stream-buffers": "^3.0.0",
-    "vorbis": "git+https://github.com/doomjs/node-vorbis.git",
+    "vorbis": "^0.2.1",
     "wav": "^1.0.0",
     "yargs": "^4.6.0"
   },

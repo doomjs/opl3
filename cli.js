@@ -12,7 +12,7 @@ var glob = require('glob');
 
 var lame = require('lame');
 var ogg = require('ogg');
-var vorbis = require('vorbis');
+var vorbis = require('./utils/vorbis-encoder');
 var Speaker = require('speaker');
 
 var OPL3 = require('./opl3');
