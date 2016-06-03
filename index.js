@@ -21,30 +21,37 @@ module.exports = {
                 
                 var len = 0;
                 var dlen = 0;
-                while (player.update()){
-                    var d = player.refresh();
-                    var n = 4 * ((49700 * d) | 0);
+                var fn = function(){
+                    var start = Date.now();
+                    while (player.update()){
+                        var d = player.refresh();
+                        var n = 4 * ((49700 * d) | 0);
 
-                    len += n;
-                    dlen += d;
+                        len += n;
+                        dlen += d;
 
-                    postMessage({ cmd: 'position', samples: len, duration: dlen });
-                    postMessage({ cmd: 'progress', value: Math.floor(player.position / player.data.byteLength * 1000) / 10 });
+                        postMessage({ cmd: 'position', samples: len, duration: dlen });
+                        postMessage({ cmd: 'progress', value: Math.floor(player.position / player.data.byteLength * 1000) / 10 });
 
-                    var arr = new Int16Array((n / 2) | 0);
-                    for (var i = 0, j = 0; i < n; i += 4, j += 2){
-                        arr.set(player.opl.read(), j);
+                        var arr = new Int16Array((n / 2) | 0);
+                        for (var i = 0, j = 0; i < n; i += 4, j += 2){
+                            arr.set(player.opl.read(), j);
+                        }
+
+                        var buf = new Buffer(arr.buffer);
+                        writer.write(buf);
+                        
+                        if (Date.now() - start > 100) return setImmediate(fn);
                     }
+                    
+                    writer.end();
 
-                    var buf = new Buffer(arr.buffer);
-                    writer.write(buf);
-                }
+                    postMessage({ cmd: 'end' });
+                    postMessage({ cmd: 'progress', value: 100 });
+                    if (typeof callback == 'function') callback(null, writer.getContents());
+                };
                 
-                writer.end();
-
-                postMessage({ cmd: 'end' });
-                postMessage({ cmd: 'progress', value: 100 });
-                if (typeof callback == 'function') callback(null, writer.getContents());
+                fn();
             }catch(err){
                 console.error(err);
                 if (typeof callback == 'function') callback(err, null);
