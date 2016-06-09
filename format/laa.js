@@ -1,14 +1,24 @@
 var extend = require('extend');
 
-function LAA(opl){
-    this.opl = opl || new OPL3();
+function LAA(opl, instruments, Midi){
+    this.opl = opl;
     this.channels = [];
     this.tracks = [];
     this.adlib_data = new Int32Array(256);
+    
+    if (typeof Midi != 'undefined'){
+        this.Midi = Midi;
+        this.midiFile = new Midi.File();
+        this.midiTrack = new Midi.Track();
+        this.midiFile.addTrack(this.midiTrack);
+    }
 
     for (var i = 0; i < 16; i++){
         this.channels.push(new MidiChannel());
         this.tracks.push(new MidiTrack());
+        if (typeof Midi != 'undefined'){
+            this.channels[i].midiTrack = this.midiTrack;
+        }
     }
 
     this.myinsbank = new Array(128);
@@ -149,10 +159,15 @@ extend(LAA.prototype, {
                                     }else nv = vel;
 
                                     this.midi_fm_playnote(on, (note + this.channels[c].nshift), nv * 2);
+                                    
 
                                     this.chp[on][0] = c;
                                     this.chp[on][1] = note;
                                     this.chp[on][2] = 0;
+                                    
+                                    if (this.midiFile){
+                                        this.midiTrack.note(c, note, 32);
+                                    }
 
                                     if (this.adlib_mode == this.ADLIB_RYTHM && c >= 11){
                         		        this.midi_write_adlib(0xbd, this.adlib_data[0xbd] & ~(0x10 >> (c - 11)));
@@ -163,6 +178,7 @@ extend(LAA.prototype, {
                                         for (var i = 0; i < 9; i++){
                                             if (this.chp[i][0] == c && this.chp[i][1] == note){
                                                 this.midi_fm_endnote(i);
+                                                this.midiTrack.noteOff(c, note);
                                                 this.chp[i][0] = -1;
                                             }
                                         }
@@ -197,6 +213,7 @@ extend(LAA.prototype, {
                         case 0xc0: //patch change
                             var x = this.getnext(1);
                             this.channels[c].inum = x;
+                            if (this.midiFile) this.channels[c].midiTrack.instrument(c, x);
                             for (var j = 0; j < 11; j++) this.channels[c].ins[j] = this.myinsbank[this.channels[c].inum][j];
                             break;
                         case 0xd0: //chanel touch

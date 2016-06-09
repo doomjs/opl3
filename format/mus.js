@@ -1,15 +1,34 @@
 var extend = require('extend');
 
-function MUS(opl, instruments){
+function MUS(opl, instruments, Midi, onlyMidi){
     this.opl = opl;
     this.adlib_data = new Int32Array(0x200);
     this.instruments = instruments || require('./genmidi.json').instruments;
+    this.Midi = Midi;
+    this.onlyMidi = onlyMidi || false;
 }
 module.exports = MUS;
 
 extend(MUS.prototype, {
     adlib_opadd: [0x00, 0x01, 0x02, 0x08, 0x09, 0x0A, 0x10, 0x11, 0x12, 0x100, 0x101, 0x102, 0x108, 0x109, 0x10a, 0x110, 0x111, 0x112],
     maxVoice: 18,
+    CtrlTranslate: [
+        0,	// program change
+        0,	// bank select
+        1,	// modulation pot
+        7,	// volume
+        10, // pan pot
+        11, // expression pot
+        91, // reverb depth
+        93, // chorus depth
+        64, // sustain pedal
+        67, // soft pedal
+        120, // all sounds off
+        123, // all notes off
+        126, // mono
+        127, // poly
+        121  // reset all controllers
+    ],
     MUS: [0x4d, 0x55, 0x53],
     load: function(buffer){
         this.data = new DataView(buffer.buffer || buffer);
@@ -23,17 +42,17 @@ extend(MUS.prototype, {
         this.channelCount = this.data.getUint16(8, true);
         this.secondaryChannels = this.data.getUint16(10, true);
         this.instrumentsCount = this.data.getUint16(12, true);
-
+        
         this.channelInstruments = [];
         for (var i = 0, j = 16; i < this.instrumentsCount; i++, j += 2){
             this.channelInstruments.push(this.data.getUint16(j, true));
         }
 
         this.channels = [];
-        for (var i = 0; i < this.channelCount; i++){
+        for (var i = 0; i < 16 /* this.channelCount */; i++){
             this.channels[i] = new MUSChannel();
         }
-        this.channels[15] = new MUSChannel();
+        //this.channels[15] = new MUSChannel();
 
         this.position = 0;
 
@@ -53,14 +72,37 @@ extend(MUS.prototype, {
 
         var last = 0;
         while (!last){
+            var deltaTime = this.deltaTime;
             var event = this.data.getUint8(this.position++);
             var channel = event & 0xf;
             var type = (event & 0x70) >> 4;
             last = event & 0x80;
-
+            
+            var midiChannel = channel;
+            if (midiChannel == 15) midiChannel = 9;
+	        else if (midiChannel >= 9) midiChannel++;
+            
+            if (this.midiTrack){
+                if (!this.chanUsed[channel]){
+                    this.chanUsed[channel] = true;
+                    
+                    //console.log('set default volume', channel);
+                    this.midiTrack.addEvent(new (this.Midi.Event)({
+                        type: this.Midi.Event.CONTROLLER,
+                        channel: midiChannel,
+                        param1: 7,
+                        param2: 127
+                    }));
+                }
+            }
+            
             switch (type){
                 case 0: //release note
                     var note = this.data.getUint8(this.position++) & 0x7f;
+                    
+                    if (this.midiTrack){
+                        this.midiTrack.noteOff(midiChannel, note, deltaTime);
+                    }
 
                     if (channel == 15){
                         var percNote = note - 35 + 128;
@@ -77,8 +119,10 @@ extend(MUS.prototype, {
                             this.midi_fm_endnote(i);
                             this.voices[i].channel = -1;
                             this.channels[channel].pitch = 128;
+                            this.channels[channel].voices[i] = false;
                         }
                     }
+                    
                     break;
                 case 1: //play note
                     var data = this.data.getUint8(this.position++);
@@ -86,6 +130,10 @@ extend(MUS.prototype, {
                     var vel = this.channels[channel].velocity;
                     if (data & 0x80){
                         this.channels[channel].velocity = vel = this.data.getUint8(this.position++) & 0x7f;
+                    }
+                    
+                    if (this.midiTrack){
+                        this.midiTrack.noteOn(midiChannel, note, deltaTime, vel);
                     }
 
                     if (channel == 15){
@@ -102,21 +150,43 @@ extend(MUS.prototype, {
                     var inst = this.channels[channel].instrument;
                     var on = this.findVoice(channel, note + inst.voices[0].baseNoteOffset);
                     this.playVoice(on, channel, inst, inst.voices[0], note + inst.voices[0].baseNoteOffset, vel);
+                    this.channels[channel].voices[on] = true;
                     break;
                 case 2: //pitch wheel
                     var pitch = this.data.getUint8(this.position++);
-                    this.channels[channel].pitch = pitch;
+                    /*this.channels[channel].pitch = pitch;
                     for (var i = 0; i < this.maxVoice; i++){
                         var voice = this.voices[i];
                         if (voice.channel == channel){
                             this.midi_fm_playnote(i, voice.note, voice.velocity, pitch);
-                            break;
                         }
+                    }*/
+                    
+                    if (this.midiTrack){
+                        this.midiTrack.addEvent(new (this.Midi.Event)({
+                            type: this.Midi.Event.PITCH_BEND,
+                            channel: midiChannel,
+                            param1: (pitch & 1) << 6,
+                            param2: (pitch >> 1) & 127,
+                            time: deltaTime
+                        }));
                     }
+                    
                     break;
                 case 3: //system event
                     var number = this.data.getUint8(this.position++) & 0x7f;
                     //console.log('system event', channel, number);
+                    if (number < 10 || number > 14){
+                        // no_op
+                    }else if (this.midiTrack){
+                        this.midiTrack.addEvent(new (this.Midi.Event)({
+                            type: this.Midi.Event.CONTROLLER,
+                            channel: midiChannel,
+                            param1: this.CtrlTranslate[number],
+                            param2: number == 12 ? this.channelCount : 0,
+                            time: deltaTime
+                        }));
+                    }
                     break;
                 case 4: //change controller
                     var ctrl = this.data.getUint8(this.position++) & 0x7f;
@@ -124,6 +194,10 @@ extend(MUS.prototype, {
                     switch (ctrl){
                         case 0: //instrument number
                             this.channels[channel].instrument = this.instruments[value];
+                            
+                            if (this.midiTrack){
+                                this.midiTrack.instrument(midiChannel, value, deltaTime);
+                            }
                             break;
                         case 1: //bank select
                             //console.log('bank select', channel, value);
@@ -136,8 +210,7 @@ extend(MUS.prototype, {
                             for (var i = 0; i < this.maxVoice; i++){
                                 var voice = this.voices[i];
                                 if (voice.channel == channel){
-                                    this.midi_fm_volume(i, voice.velocity)
-                                    break;
+                                    this.midi_fm_volume(i, voice.velocity);
                                 }
                             }
                             break;
@@ -164,35 +237,67 @@ extend(MUS.prototype, {
                             //console.log('unknown controller', channel, ctrl, value);
                             break;
                     }
+                    
+                    if (this.midiTrack && ctrl > 0 && ctrl < 10){
+                        this.midiTrack.addEvent(new (this.Midi.Event)({
+                            type: this.Midi.Event.CONTROLLER,
+                            channel: midiChannel,
+                            param1: this.CtrlTranslate[ctrl],
+                            param2: value,
+                            time: deltaTime
+                        }));
+                    }
+                    
                     break;
                 case 6: //score end
-                    //console.log('score end', this.maxVoiceOn);
                     for (var i = 0; i < this.maxVoice; i++){
                         if (this.voices[i].channel > 0){
                             this.midi_fm_endnote(i);
                         }
                     }
+                    
+                    if (this.midiTrack){
+                        this.midiTrack.addEvent(new (this.Midi.MetaEvent)({
+                            type: this.Midi.MetaEvent.END_OF_TRACK
+                        }));
+                        
+                        this.midiBuffer = this.midiFile.toBytes();
+                    }
+                    
                     this.rewind();
                     return false;
             }
-        }
 
-        var time = 0;
-        while (true){
-            var byte = this.data.getUint8(this.position++);
-            time = time * 128 + (byte & 0x7f);
-            if (!(byte & 0x80)) break;
-        }
+            var time = 0;
+            if (event & 0x80){
+                while (true){
+                    var byte = this.data.getUint8(this.position++);
+                    time = time * 128 + (byte & 0x7f);
+                    if (!(byte & 0x80)) break;
+                }
 
+                this.deltaTime = time;
+            }else this.deltaTime = 0;
+        }
+        
         this.wait = time * 1 / 140;
-
         return true;
     },
     refresh: function(){
         return this.wait > 0.01 ? this.wait : 0.01; 
     },
     rewind: function(){
+        if (this.Midi){
+            this.midiFile = new this.Midi.File();
+            this.midiTrack = new this.Midi.Track();
+            this.midiFile.addTrack(this.midiTrack);
+            
+            this.midiTrack.setTempo(65);
+            this.chanUsed = [];
+        }
+        
         this.position = this.scoreStart;
+        this.deltaTime = 0;
         this.midi_fm_reset();
     },
     playVoice: function(on, channel, inst, voice, note, vel, pitch){
@@ -204,83 +309,71 @@ extend(MUS.prototype, {
         this.voices[on].note = note;
         this.voices[on].velocity = vel;
         this.voices[on].timestamp = Date.now();
-
+        
         this.midi_fm_playnote(on, note, vel, pitch || this.channels[channel].pitch);
     },
     findVoice: function(channel, note){
-        var on = -1;
-        /*for (var i = 0; i < this.maxVoice; i++){
-            if (this.voices[i].channel == channel /*&& this.voices[i].note == note){
-                on = i;
-                this.midi_fm_endnote(on);
-                return on;
+        if (channel != 15){
+            var i = 0;
+            var t = [];
+            for (var on in this.channels[channel].voices){
+                if (this.channels[channel].voices[on]) t.push(on);
             }
-        }*/
-
-        /*if (on < 0){
-            var channelVoiceCount = 0;
-            var maxVoicePerChannel = channel == 15 ? 9 : 2;
+            
+            var self = this;
+            t.sort(function(a, b){
+                return self.voices[a].timestamp - self.voices[b].timestamp;
+            });
+            
+            if (t.length > 2){
+                i = t.pop();
+                this.midi_fm_endnote(i);
+                this.voices[i].channel = -1;
+                this.channels[channel].voices[i] = false;
+            }
+        }
+        
+        on = -1;
+        for (var i = 0; i < this.maxVoice; i++){
+            if (this.voices[i].channel < 0){
+                return i;
+            }
+        }
+        
+        if (on < 0){
             for (var i = 0; i < this.maxVoice; i++){
                 if (this.voices[i].instrument == this.channels[channel].instrument){
                     if (on < 0) on = i;
-                    else if (this.voices[i].timestamp > this.voices[on].timestamp) on = i;
-                    channelVoiceCount++;
-                    if (channelVoiceCount > maxVoicePerChannel){
-                        this.midi_fm_endnote(on);
-                        return on;
-                    }
-                }
-            }
-            on = -1;
-        }*/
-
-        if (on < 0){
-            for (var i = 0; i < this.maxVoice; i++){
-                if (this.voices[i].channel < 0){
-                    return i;
                 }
             }
         }
-
+        
         if (on < 0){
             for (var i = 0; i < this.maxVoice; i++){
                 if (this.voices[i].channel == channel){
                     on = i;
-                    this.midi_fm_endnote(on);
-                    return on;
+                    break;
                 }
             }
         }
-
+        
         if (on < 0){
+            var t = Infinity;
             for (var i = 0; i < this.maxVoice; i++){
-                if (this.voices[i].instrument == this.channels[channel].instrument){
-                    on = i;
-                    this.midi_fm_endnote(on);
-                    return on;
-                }
-            }
-        }
-
-        var now = Date.now();
-        if (on < 0){
-            var ts = now;
-            for (var i = 0; i < this.maxVoice; i++){
-                if (this.voices[i].timestamp < ts){
-                    ts = this.voices[i].timestamp;
+                if (this.voices[i].timestamp < t){
+                    t = this.voices[i].timestamp;
                     on = i;
                 }
             }
-
-            if (on >= 0){
-                this.midi_fm_endnote(on);
-                return on;
-            }
         }
-
+        
+        if (on < 0) throw new Error("No free OPL channel");
+        
+        this.midi_fm_endnote(on);
         return on;
     },
     midi_write_adlib: function(r, v){
+        //console.log('midi_write_adlib', r, v);
         this.adlib_data[r] = v;
 
         var a = 0;
@@ -288,7 +381,7 @@ extend(MUS.prototype, {
             a = 1;
             r -= 0x100;
         }
-        this.opl.write(a, r, v);
+        if (!this.onlyMidi) this.opl.write(a, r, v);
     },
     midi_fm_instrument: function(voice, inst){
         var modulating = (inst.feedback & 0x01) == 0;
@@ -321,7 +414,16 @@ extend(MUS.prototype, {
         }
     },
     midi_fm_playnote: function(voice, note, volume, pitch){
-        this.midi_fm_volume(voice, volume);
+        if (typeof volume != 'undefined') this.midi_fm_volume(voice, volume);
+        if (volume == 0){
+            console.log('zero volume play note!');
+            this.midi_fm_endnote(voice);
+            var channel = this.voices[voice].channel; 
+            this.voices[voice].channel = -1;
+            this.channels[channel].pitch = 128;
+            this.channels[channel].voices[voice] = false;
+            return;
+        }
 
         var freq;
         var freqIndex = 64 + 32 * note;
@@ -509,4 +611,5 @@ function MUSChannel(){
     this.volume = 100;
     this.velocity = 0;
     this.pitch = 128;
+    this.voices = {};
 }

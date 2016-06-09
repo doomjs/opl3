@@ -9,15 +9,17 @@ Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozen
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.2.2
-Usage:: opl3 <input file> [OPTIONS]
+OPL3 emulator v0.3.0
+Usage: opl3 <input file> [OPTIONS]
 
 Options:
   --mp3         Export to MP3
   --wav         Export to WAV
   --ogg         Export to OGG
+  --mid         Export to MIDI
   --laa         Use LAA format
   --mus         Use MUS format
+  --dro         Use DRO format
   -h, --help    You read that just now
   -p, --play    Play after processing
   -o, --output  Output directory
@@ -58,12 +60,14 @@ player.load(fs.readFileSync('./laa/dott logo.laa'), function(err, result){
 
 ## Supported format types
 
-* LAA: LucasArts music format (used in Day of the Tentacles)
+* LAA: LucasArts music format (used in games like Day of the Tentacles)
 * MUS: Doom music format
+* DRO: DosBox RAW OPL format
 
 ## Supported audio export formats
 
 * WAV: PCM audio WAVE
 * MP3: using [node-lame](https://github.com/TooTallNate/node-lame)
 * OGG: using [node-vorbis](https://github.com/TooTallNate/node-vorbis) and [node-ogg](https://github.com/TooTallNate/node-ogg)
+* MIDI: currently only supported by MUS file format handler
 * Audio playback: using [node-speaker](https://github.com/TooTallNate/node-speaker)

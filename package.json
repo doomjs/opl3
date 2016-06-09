@@ -1,6 +1,6 @@
 {
   "name": "opl3",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "OPL3 emulator library",
   "main": "index.js",
   "preferGlobal": true,
@@ -15,12 +15,18 @@
     "url": "git://github.com/doomjs/opl3.git"
   },
   "keywords": [
+    "opl",
     "opl3",
+    "YMF262",
     "javascript",
     "sound",
     "blaster",
     "music",
-    "doom"
+    "doom",
+    "dosbox",
+    "laa",
+    "mus",
+    "dro"
   ],
   "author": "IDDQD",
   "license": "MIT",
@@ -34,12 +40,12 @@
     "duration": "^0.2.0",
     "extend": "^3.0.0",
     "glob": "^7.0.3",
+    "jsmidgen": "^0.1.5",
     "lame": "^1.2.3",
     "mkdirp": "^0.5.1",
     "ogg": "^1.2.4",
     "progress": "^1.1.8",
     "speaker": "^0.3.0",
-    "stream-array": "^1.1.1",
     "stream-buffers": "^3.0.0",
     "vorbis": "^0.2.1",
     "wav": "^1.0.0",

@@ -1,7 +1,7 @@
 var util = require('util');
 var extend = require('extend');
 
-function OPL3(ch){
+function OPL3(){
     this.nts = 0;
     this.dam = 0;
     this.dvb = 0;
@@ -25,10 +25,9 @@ function OPL3(ch){
     this.initRhythmChannels();
     this.initChannels();
 
-    ch = ch || 4;
-    this.output = new Int16Array(ch);
+    this.output = new Int16Array(2);
     this.outputBuffer = new Float64Array(4);
-    this.outputChannelNumber = ch;
+    this.outputChannelNumber = 2;
 }
 module.exports = OPL3;
 
@@ -94,7 +93,10 @@ extend(OPL3.prototype, {
                 // Unique registers for the entire OPL3:
                 if (array == 1){
                     if (address == 0x04) this.update_2_CONNECTIONSEL6();
-                    else if (address == 0x05) this.update_7_NEW1();
+                    else if (address == 0x05){
+                        //console.log(array, address, data);
+                        this.update_7_NEW1();
+                    }
                 }else if (address == 0x08) this.update_1_NTS1_6();
                 break;
             case 0xA0:
@@ -116,7 +118,7 @@ extend(OPL3.prototype, {
                 break;
             // 0xC0...0xC8 keeps cha,chb,chc,chd,fb,cnt for each channel:
             case 0xC0:
-                if (address <= 0xC8) this.channels[array][address&0x0F].update_CHD1_CHC1_CHB1_CHA1_FB3_CNT1();
+                if (address <= 0xC8) this.channels[array][address & 0x0F].update_CHD1_CHC1_CHB1_CHA1_FB3_CNT1();
                 break;
             // Registers for each of the 36 Operators:
             default:
@@ -306,8 +308,8 @@ extend(OPL3.prototype, {
     set4opConnections: function(){
         // bits 0, 1, 2 sets respectively 2-op channels (1,4), (2,5), (3,6) to 4-op operation.
         // bits 3, 4, 5 sets respectively 2-op channels (10,13), (11,14), (12,15) to 4-op operation.
-        for (var array = 0; array < 2; array++){
-            for (var i = 0; i < 3; i++){
+        for (var array = 0; array < 2; ++array){
+            for (var i = 0; i < 3; ++i){
                 if (this._new == 1){
                     var shift = array * 3 + i;
                     var connectionBit = (this.connectionsel >> shift) & 0x01;
@@ -486,10 +488,10 @@ Channel4op.prototype.getChannelOutput = function(){
         op1Output = 0, op2Output = 0, op3Output = 0, op4Output = 0;
 
     var secondChannelBaseAddress = this.channelBaseAddress + 3;
-    var secondCnt = this.opl.registers[this.secondChannelBaseAddress + ChannelData.CHD1_CHC1_CHB1_CHA1_FB3_CNT1_Offset] & 1;
+    var secondCnt = this.opl.registers[secondChannelBaseAddress + ChannelData.CHD1_CHC1_CHB1_CHA1_FB3_CNT1_Offset] & 1;
     var cnt4op = (this.cnt << 1) | secondCnt;
 
-    var feedbackOutput = (feedback[0] + feedback[1]) / 2;
+    var feedbackOutput = (this.feedback[0] + this.feedback[1]) / 2;
 
     switch (cnt4op) {
         case 0:
@@ -538,8 +540,8 @@ Channel4op.prototype.getChannelOutput = function(){
             break;
     }
 
-    feedback[0] = feedback[1];
-    feedback[1] = (op1Output * ChannelData.feedback[fb]) % 1;
+    this.feedback[0] = this.feedback[1];
+    this.feedback[1] = (op1Output * ChannelData.feedback[this.fb]) % 1;
 
     return this.getInFourChannels(channelOutput);
 };
@@ -566,7 +568,10 @@ Channel4op.prototype.updateOperators = function(){
     this.op4.updateOperator(keyScaleNumber, f_number, this.block);
 };
 
-function DisabledChannel(){}
+function DisabledChannel(opl){
+    Channel.call(this, 0, opl);
+    this.opl = opl;
+}
 util.inherits(DisabledChannel, Channel);
 
 DisabledChannel.prototype.getChannelOutput = function(){ return this.getInFourChannels(0); };
@@ -759,11 +764,11 @@ extend(EnvelopeGenerator.prototype, {
                 break;
             case 2:
                 // ~1.5 dB/Octave
-                this.attenuation = OperatorData.ksl3dBtable[hi4bits][block]/2;
+                this.attenuation = OperatorData.ksl3dBtable[hi4bits][block] / 2;
                 break;
             case 3:
                 // ~6 dB/Octave
-                this.attenuation = OperatorData.ksl3dBtable[hi4bits][block]*2;
+                this.attenuation = OperatorData.ksl3dBtable[hi4bits][block] * 2;
         }
     },
     setActualAttackRate: function(attackRate, ksr, keyScaleNumber) {

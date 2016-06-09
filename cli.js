@@ -18,16 +18,19 @@ var Speaker = require('speaker');
 var OPL3 = require('./opl3');
 var LAA = require('./format/laa');
 var MUS = require('./format/mus');
+var DRO = require('./format/dro');
 var WAV = require('./wav.js').WAV;
 var package = require('./package.json');
 
-var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u001b[97mUsage:\u001b[39m\u001b[49m: $0 <input file> [OPTIONS]')
-	.example('$0 ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav --ogg dott_logo.ogg')
+var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u001b[97mUsage:\u001b[39m\u001b[49m opl3 <input file> [OPTIONS]')
+	.example('opl3 ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav --ogg dott_logo.ogg')
 	.describe('mp3', 'Export to MP3')
 	.describe('wav', 'Export to WAV')
 	.describe('ogg', 'Export to OGG')
+	.describe('mid', 'Export to MIDI')
 	.describe('laa', 'Use LAA format')
 	.describe('mus', 'Use MUS format')
+	.describe('dro', 'Use DRO format')
 	.describe('play', 'Play after processing')
 	.describe('output', 'Output directory')
 	.describe('help', 'You read that just now')
@@ -55,11 +58,15 @@ else{
 		process.exit(1);
 	}
 	
-	if (!(argv.wav || argv.mp3 || argv.ogg || argv.play)){
+	if (!(argv.wav || argv.mp3 || argv.ogg || argv.mid || argv.play)){
 		argv.wav = true;
 		argv.mp3 = true;
 		argv.ogg = true;
+		argv.mid = true;
 	}
+	
+	var Midi = null;
+	if (argv.mid) Midi = require('jsmidgen'); 
 	
 	glob(argv._[0], function(err, files){
 		if (files.length < 1){
@@ -88,6 +95,7 @@ else{
 				var midiFormat;
 				if (argv.laa || filename.split('.').pop().toLowerCase() == 'laa') midiFormat = LAA;
 				else if (argv.mus || filename.split('.').pop().toLowerCase() == 'mus') midiFormat = MUS;
+				else if (argv.dro || filename.split('.').pop().toLowerCase() == 'dro') midiFormat = DRO;
 				else{
 					console.log(chalk.red('Unknown file format!'));
 					process.exit(1);
@@ -110,12 +118,12 @@ else{
 						var writer = fs.createWriteStream(path.join(argv.output, path.basename(filename + '.tmp')));
 						var writer32 = fs.createWriteStream(path.join(argv.output, path.basename(filename + '.tmp32')));
 						
-						var player = new midiFormat(new OPL3(2));
+						var player = new midiFormat(new OPL3(), null, Midi, argv.mid && !(argv.wav || argv.mp3 || argv.ogg || argv.play));
 						player.load(new Uint8Array(buffer));
 						
 						var dlen = 0;
 						var fn = function(){
-							var start = Date.now();
+							var t = Date.now();
 							while (player.update()){
 								var d = player.refresh();
 								var n = 4 * ((49700 * d) | 0);
@@ -125,7 +133,7 @@ else{
 								len += n;
 								dlen += d;
 
-								var b16 = new Int16Array((n / 2) | 0);
+								var b16 = new Int16Array(n / 2);
 								for (var i = 0, j = 0; i < n; i += 4, j += 2){
 									b16.set(player.opl.read(), j);
 								}
@@ -139,7 +147,7 @@ else{
 								writer.write(new Buffer(b16.buffer));
 								writer32.write(new Buffer(b32.buffer));
 								
-								if (Date.now() - start > 100) return setImmediate(fn);
+								if (Date.now() - t > 100) return setImmediate(fn);
 							}
 							
 							bar.update(1);
@@ -148,7 +156,15 @@ else{
 							writer.end();
 							writer32.end();
 							
-							callback();
+							if (argv.mid && player.midiBuffer){
+								var midiFilename = typeof argv.mid != 'string' ? path.join(argv.output, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mid')) : argv.mid;
+								mkdirp.sync(path.dirname(midiFilename));
+						
+								fs.writeFile(midiFilename, player.midiBuffer, 'binary', function(){
+									console.log('MIDI exported to ' + chalk.yellow(midiFilename));
+									callback();
+								});
+							}else callback();
 						};
 						
 						fn();
@@ -255,7 +271,7 @@ else{
 							total: 100
 						});
 					
-						speaker = new Speaker({
+						var speaker = new Speaker({
 							channels: 2,          // 2 channels
 							bitDepth: 16,         // 16-bit samples
 							sampleRate: 49700     // 49,700 Hz sample rate
@@ -287,7 +303,7 @@ else{
 				});
 			};
 		}), function(){
-			console.log('Finished in ' + chalk.green(new Duration(new Date(0), new Date(Date.now() - start)).toString('%S.%L') + 's'));
+			console.log('Finished in ' + chalk.green(new Duration(new Date(0), new Date(Date.now() - start)).toString(1)));
 		});
 	});
 }
