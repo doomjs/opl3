@@ -19,6 +19,7 @@ var OPL3 = require('./opl3');
 var LAA = require('./format/laa');
 var MUS = require('./format/mus');
 var DRO = require('./format/dro');
+var IMF = require('./format/imf');
 var WAV = require('./wav.js').WAV;
 var package = require('./package.json');
 
@@ -31,6 +32,7 @@ var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u
 	.describe('laa', 'Use LAA format')
 	.describe('mus', 'Use MUS format')
 	.describe('dro', 'Use DRO format')
+	.describe('imf', 'Use IMF format')
 	.describe('play', 'Play after processing')
 	.describe('output', 'Output directory')
 	.describe('help', 'You read that just now')
@@ -76,15 +78,15 @@ else{
 		
 		process.on('SIGINT', function(){
 			files.forEach(function(filename){
-				if (fs.existsSync(path.join(argv.output, path.basename(filename + '.tmp')))) fs.unlinkSync(path.join(argv.output, path.basename(filename + '.tmp')));
-				if (fs.existsSync(path.join(argv.output, path.basename(filename + '.tmp32')))) fs.unlinkSync(path.join(argv.output, path.basename(filename + '.tmp32')));
+				if (fs.existsSync(path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp')))) fs.unlinkSync(path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp')));
+				if (fs.existsSync(path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp32')))) fs.unlinkSync(path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp32')));
 			});
 			process.exit(1);
 		});
 		
 		async.series(files.map(function(filename){
-			argv.output = argv.output || path.dirname(filename);
-			mkdirp.sync(argv.output);
+			var outputDir = argv.output || path.dirname(filename);
+			mkdirp.sync(outputDir);
 			
 			return function(next){
 				if (!fs.existsSync(filename)){
@@ -96,6 +98,7 @@ else{
 				if (argv.laa || filename.split('.').pop().toLowerCase() == 'laa') midiFormat = LAA;
 				else if (argv.mus || filename.split('.').pop().toLowerCase() == 'mus') midiFormat = MUS;
 				else if (argv.dro || filename.split('.').pop().toLowerCase() == 'dro') midiFormat = DRO;
+				else if (argv.imf || filename.split('.').pop().toLowerCase() == 'imf') midiFormat = IMF;
 				else{
 					console.log(chalk.red('Unknown file format!'));
 					process.exit(1);
@@ -115,8 +118,8 @@ else{
 							total: buffer.length
 						});
 						
-						var writer = fs.createWriteStream(path.join(argv.output, path.basename(filename + '.tmp')));
-						var writer32 = fs.createWriteStream(path.join(argv.output, path.basename(filename + '.tmp32')));
+						var writer = fs.createWriteStream(path.join(outputDir, path.basename(filename + '.tmp')));
+						var writer32 = fs.createWriteStream(path.join(outputDir, path.basename(filename + '.tmp32')));
 						
 						var player = new midiFormat(new OPL3(), null, Midi, argv.mid && !(argv.wav || argv.mp3 || argv.ogg || argv.play));
 						player.load(new Uint8Array(buffer));
@@ -157,7 +160,7 @@ else{
 							writer32.end();
 							
 							if (argv.mid && player.midiBuffer){
-								var midiFilename = typeof argv.mid != 'string' ? path.join(argv.output, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mid')) : argv.mid;
+								var midiFilename = typeof argv.mid != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mid')) : argv.mid;
 								mkdirp.sync(path.dirname(midiFilename));
 						
 								fs.writeFile(midiFilename, player.midiBuffer, 'binary', function(){
@@ -173,7 +176,7 @@ else{
 				
 				if (argv.wav){
 					tasks.push(function(callback){
-						var wavFilename = typeof argv.wav != 'string' ? path.join(argv.output, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.wav')) : argv.wav;
+						var wavFilename = typeof argv.wav != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.wav')) : argv.wav;
 						mkdirp.sync(path.dirname(wavFilename));
 						
 						fs.writeFile(wavFilename, new Buffer(WAV(bufferWriter.getContents(), 49700)), function(err){
@@ -202,11 +205,11 @@ else{
 							mode: lame.STEREO // STEREO (default), JOINTSTEREO, DUALCHANNEL or MONO
 						});
 						
-						var mp3Filename = typeof argv.mp3 != 'string' ? path.join(argv.output, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mp3')) : argv.mp3;
+						var mp3Filename = typeof argv.mp3 != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mp3')) : argv.mp3;
 						mkdirp.sync(path.dirname(mp3Filename));
 						
 						var writer = fs.createWriteStream(mp3Filename);
-						var reader = fs.createReadStream(path.join(argv.output, path.basename(filename + '.tmp')));
+						var reader = fs.createReadStream(path.join(outputDir, path.basename(filename + '.tmp')));
 						
 						reader.pipe(encoder);
 						encoder.pipe(writer);
@@ -239,11 +242,11 @@ else{
 							sampleRate: 49700
 						});
 						
-						var oggFilename = typeof argv.ogg != 'string' ? path.join(argv.output, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.ogg')) : argv.ogg;
+						var oggFilename = typeof argv.ogg != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.ogg')) : argv.ogg;
 						mkdirp.sync(path.dirname(oggFilename));
 						
 						var writer = fs.createWriteStream(oggFilename);
-						var reader = fs.createReadStream(path.join(argv.output, path.basename(filename + '.tmp32')));
+						var reader = fs.createReadStream(path.join(outputDir, path.basename(filename + '.tmp32')));
 						
 						reader.pipe(ve);
 						ve.pipe(oe.stream());
@@ -277,7 +280,7 @@ else{
 							sampleRate: 49700     // 49,700 Hz sample rate
 						});
 						
-						var reader = fs.createReadStream(path.join(argv.output, path.basename(filename + '.tmp')));
+						var reader = fs.createReadStream(path.join(outputDir, path.basename(filename + '.tmp')));
 						reader.pipe(speaker);
 						
 						var pos = 0;
@@ -297,8 +300,8 @@ else{
 				}
 
 				async.series(tasks, function(err){
-					if (fs.existsSync(path.join(argv.output, path.basename(filename + '.tmp')))) fs.unlink(path.join(argv.output, path.basename(filename + '.tmp')));
-					if (fs.existsSync(path.join(argv.output, path.basename(filename + '.tmp32')))) fs.unlink(path.join(argv.output, path.basename(filename + '.tmp32')));
+					if (fs.existsSync(path.join(outputDir, path.basename(filename + '.tmp')))) fs.unlink(path.join(outputDir, path.basename(filename + '.tmp')));
+					if (fs.existsSync(path.join(outputDir, path.basename(filename + '.tmp32')))) fs.unlink(path.join(outputDir, path.basename(filename + '.tmp32')));
 					next(err);
 				});
 			};
