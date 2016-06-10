@@ -2,10 +2,13 @@ module.exports = {
     OPL3: require('./opl3'),
     format: {
         LAA: require('./format/laa'),
-        MUS: require('./format/mus')
+        MUS: require('./format/mus'),
+        DRO: require('./format/dro'),
+        IMF: require('./format/imf')
     },
     WAV: require('./wav').WAV,
     Player: function Player(format, options){
+        options = options || {};
         this.load = function(buffer, callback, postMessage){
             try{
                 postMessage = postMessage || function(){};
@@ -16,7 +19,7 @@ module.exports = {
                     incrementAmount: (512 * 1024)
                 });
                 
-                var player = new format(new module.exports.OPL3(2), options);
+                var player = new format(new module.exports.OPL3(), options);
                 player.load(buffer);
                 
                 var len = 0;
@@ -45,10 +48,25 @@ module.exports = {
                     }
                     
                     writer.end();
+                    
+                    var pcmBuffer = writer.getContents();
+                    
+                    if (options.normalization){
+                        var peak = 0;
+                        var targetPeak = 32768;
+                        for (var i = 0; i < pcmBuffer.length; i += 2){
+                            var p = Math.abs(dv.getInt16(i, true));
+                            if (p > peak) peak = p;
+                        }
+                        var scale = targetPeak / peak;
+                        for (var i = 0; i < pcmBuffer.length; i += 2){
+                            dv.setInt16(i, Math.round(dv.getInt16(i, true) * scale), true);
+                        }
+                    }
 
                     postMessage({ cmd: 'end' });
                     postMessage({ cmd: 'progress', value: 100 });
-                    if (typeof callback == 'function') callback(null, writer.getContents());
+                    if (typeof callback == 'function') callback(null, pcmBuffer);
                 };
                 
                 fn();

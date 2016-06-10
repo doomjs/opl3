@@ -724,6 +724,10 @@ function EnvelopeGenerator(opl){
     this.totalLevel = 0;
     this.sustainLevel = 0;
     this.x = this.dBtoX(-96);
+    this.resolutionMaximum = this.dBtoX(-0.1875);
+    this.percentage10 = this.percentageToX(0.1);
+    this.percentage90 = this.percentageToX(0.9);
+    
     this.envelope = -96;
 }
 EnvelopeGenerator.Stage = {
@@ -785,7 +789,7 @@ extend(EnvelopeGenerator.prototype, {
         var period10to90inSeconds = EnvelopeGeneratorData.attackTimeValuesTable[this.actualAttackRate][1] / 1000;
         var period10to90inSamples = (period10to90inSeconds * OPL3Data.sampleRate) | 0;
         // The x increment is dictated by the period between 10% and 90%:
-        this.xAttackIncrement = OPL3Data.calculateIncrement(this.percentageToX(0.1), this.percentageToX(0.9), period10to90inSeconds);
+        this.xAttackIncrement = OPL3Data.calculateIncrement(this.percentage10, this.percentage90, period10to90inSeconds);
         // Discover how many samples are still from the top.
         // It cannot reach 0 dB, since x is a logarithmic parameter and would be
         // negative infinity. So we will use -0.1875 dB as the resolution
@@ -794,10 +798,10 @@ extend(EnvelopeGenerator.prototype, {
         // percentageToX(0.9) + samplesToTheTop*xAttackIncrement = dBToX(-0.1875); ->
         // samplesToTheTop = (dBtoX(-0.1875) - percentageToX(0.9)) / xAttackIncrement); ->
         // period10to100InSamples = period10to90InSamples + samplesToTheTop; ->
-        var period10to100inSamples = (period10to90inSamples + (this.dBtoX(-0.1875) - this.percentageToX(0.9)) / this.xAttackIncrement) | 0;
+        var period10to100inSamples = (period10to90inSamples + (this.resolutionMaximum - this.percentage90) / this.xAttackIncrement) | 0;
         // Discover the minimum x that, through the attackIncrement value, keeps
         // the 10%-90% period, and reaches 0 dB at the total period:
-        this.xMinimumInAttack = this.percentageToX(0.1) - (period0to100inSamples - period10to100inSamples) * this.xAttackIncrement;
+        this.xMinimumInAttack = this.percentage10 - (period0to100inSamples - period10to100inSamples) * this.xAttackIncrement;
     },
     setActualDecayRate: function(decayRate, ksr, keyScaleNumber){
         this.actualDecayRate = this.calculateActualRate(decayRate, ksr, keyScaleNumber) | 0;

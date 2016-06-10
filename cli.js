@@ -9,6 +9,7 @@ var mkdirp = require('mkdirp');
 var path = require('path');
 var async = require('async');
 var glob = require('glob');
+var numeral = require('numeral');
 
 var lame = require('lame');
 var ogg = require('ogg');
@@ -33,10 +34,12 @@ var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u
 	.describe('mus', 'Use MUS format')
 	.describe('dro', 'Use DRO format')
 	.describe('imf', 'Use IMF format')
+	.describe('normalize', 'PCM audio normalization (default on, turn off with -n0)')
 	.describe('play', 'Play after processing')
 	.describe('output', 'Output directory')
 	.describe('help', 'You read that just now')
 	.alias('h', 'help')
+	.alias('n', 'normalize')
 	.alias('p', 'play')
 	.alias('o', 'output')
 	.epilog(chalk.cyan('Copyright (c) 2016 IDDQD@doom.js'))
@@ -59,6 +62,8 @@ else{
 		console.log(chalk.red('Input file required!'));
 		process.exit(1);
 	}
+	
+	if (typeof argv.normalize == 'undefined') argv.normalize = 1;
 	
 	if (!(argv.wav || argv.mp3 || argv.ogg || argv.mid || argv.play)){
 		argv.wav = true;
@@ -109,6 +114,7 @@ else{
 					initialSize: (1024 * 1024),
 					incrementAmount: (512 * 1024)
 				});
+				var pcmBuffer = null;
 				var len = 0;
 				var tasks = [];
 				tasks.push(function(callback){
@@ -117,9 +123,6 @@ else{
 							width: 20,
 							total: buffer.length
 						});
-						
-						var writer = fs.createWriteStream(path.join(outputDir, path.basename(filename + '.tmp')));
-						var writer32 = fs.createWriteStream(path.join(outputDir, path.basename(filename + '.tmp32')));
 						
 						var player = new midiFormat(new OPL3(), null, Midi, argv.mid && !(argv.wav || argv.mp3 || argv.ogg || argv.play));
 						player.load(new Uint8Array(buffer));
@@ -140,15 +143,8 @@ else{
 								for (var i = 0, j = 0; i < n; i += 4, j += 2){
 									b16.set(player.opl.read(), j);
 								}
-
-								var b32 = new Float32Array(b16.length);
-								for (var i = 0; i < b16.length; i++){
-									b32[i] = b16[i] / 32768 * 4; //TODO: normalize
-								}
 								
 								bufferWriter.write(new Buffer(b16.buffer));
-								writer.write(new Buffer(b16.buffer));
-								writer32.write(new Buffer(b32.buffer));
 								
 								if (Date.now() - t > 100) return setImmediate(fn);
 							}
@@ -156,18 +152,52 @@ else{
 							bar.update(1);
 						
 							bufferWriter.end();
-							writer.end();
-							writer32.end();
+							pcmBuffer = bufferWriter.getContents();
+							var dv = new DataView(pcmBuffer.buffer);
 							
-							if (argv.mid && player.midiBuffer){
-								var midiFilename = typeof argv.mid != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mid')) : argv.mid;
-								mkdirp.sync(path.dirname(midiFilename));
-						
-								fs.writeFile(midiFilename, player.midiBuffer, 'binary', function(){
-									console.log('MIDI exported to ' + chalk.yellow(midiFilename));
-									callback();
+							if (argv.normalize){
+								var normbar = new ProgressBar('Normalizing ' + chalk.yellow(filename) + ' [:bar] :percent :etas', {
+									width: 20,
+									total: 100
 								});
-							}else callback();
+								
+								var peak = 0;
+								var targetPeak = 32768;
+								for (var i = 0; i < pcmBuffer.length; i += 2){
+									var p = Math.abs(dv.getInt16(i, true));
+									if (p > peak) peak = p;
+									if (i % 1024 == 0) normbar.update(i / (pcmBuffer.length * 2));
+								}
+								var scale = targetPeak / peak;
+								for (var i = 0; i < pcmBuffer.length; i += 2){
+									dv.setInt16(i, Math.round(dv.getInt16(i, true) * scale), true);
+									if (i % 1024 == 0) normbar.update((pcmBuffer.length + i) / (pcmBuffer.length * 2));
+								}
+								
+								normbar.update(1);
+								console.log('Normalization gain ' + chalk.green('x' + numeral(scale).format('0.00')));
+							}
+							
+							var pcm32Buffer = new Float32Array(pcmBuffer.length / 2);
+							for (var i = 0, offset = 0; offset < pcmBuffer.length; i++, offset += 2){
+								pcm32Buffer[i] = dv.getInt16(offset, true) / 32768;
+							}
+							
+							async.series([
+								function(next){ fs.writeFile(path.join(outputDir, path.basename(filename + '.tmp')), pcmBuffer, next); },
+								function(next){ fs.writeFile(path.join(outputDir, path.basename(filename + '.tmp32')), new Buffer(pcm32Buffer.buffer), next); },
+								function(callback){
+									if (argv.mid && player.midiBuffer){
+										var midiFilename = typeof argv.mid != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mid')) : argv.mid;
+										mkdirp.sync(path.dirname(midiFilename));
+								
+										fs.writeFile(midiFilename, player.midiBuffer, 'binary', function(err){
+											console.log('MIDI exported to ' + chalk.yellow(midiFilename));
+											callback(err);
+										});
+									}else callback();
+								}
+							], callback);							
 						};
 						
 						fn();
@@ -179,7 +209,7 @@ else{
 						var wavFilename = typeof argv.wav != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.wav')) : argv.wav;
 						mkdirp.sync(path.dirname(wavFilename));
 						
-						fs.writeFile(wavFilename, new Buffer(WAV(bufferWriter.getContents(), 49700)), function(err){
+						fs.writeFile(wavFilename, new Buffer(WAV(pcmBuffer, 49700)), function(err){
 							console.log('WAV exported to ' + chalk.yellow(wavFilename));
 							callback();
 						});
@@ -300,8 +330,8 @@ else{
 				}
 
 				async.series(tasks, function(err){
-					if (fs.existsSync(path.join(outputDir, path.basename(filename + '.tmp')))) fs.unlink(path.join(outputDir, path.basename(filename + '.tmp')));
-					if (fs.existsSync(path.join(outputDir, path.basename(filename + '.tmp32')))) fs.unlink(path.join(outputDir, path.basename(filename + '.tmp32')));
+					if (fs.existsSync(path.join(outputDir, path.basename(filename + '.tmp')))) fs.unlinkSync(path.join(outputDir, path.basename(filename + '.tmp')));
+					if (fs.existsSync(path.join(outputDir, path.basename(filename + '.tmp32')))) fs.unlinkSync(path.join(outputDir, path.basename(filename + '.tmp32')));
 					next(err);
 				});
 			};

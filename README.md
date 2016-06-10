@@ -9,21 +9,22 @@ Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozen
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.3.1
+OPL3 emulator v0.3.2
 Usage: opl3 <input file> [OPTIONS]
 
 Options:
-  --mp3         Export to MP3
-  --wav         Export to WAV
-  --ogg         Export to OGG
-  --mid         Export to MIDI
-  --laa         Use LAA format
-  --mus         Use MUS format
-  --dro         Use DRO format
-  --imf         Use IMF format
-  -h, --help    You read that just now
-  -p, --play    Play after processing
-  -o, --output  Output directory
+  --mp3            Export to MP3
+  --wav            Export to WAV
+  --ogg            Export to OGG
+  --mid            Export to MIDI
+  --laa            Use LAA format
+  --mus            Use MUS format
+  --dro            Use DRO format
+  --imf            Use IMF format
+  -h, --help       You read that just now
+  -n, --normalize  PCM audio normalization (default on, turn off with -n0)
+  -p, --play       Play after processing
+  -o, --output     Output directory
 
 Examples:
   opl3 ./laa/dott_logo.laa --mp3 dott_logo.mp3 --wav dott_logo.wav --ogg dott_logo.ogg
@@ -73,3 +74,13 @@ player.load(fs.readFileSync('./laa/dott logo.laa'), function(err, result){
 * OGG: using [node-vorbis](https://github.com/TooTallNate/node-vorbis) and [node-ogg](https://github.com/TooTallNate/node-ogg)
 * MIDI: currently only supported by MUS file format handler
 * Audio playback: using [node-speaker](https://github.com/TooTallNate/node-speaker)
+
+## PCM audio normalization
+
+By default the command line utility uses _peak normalization_ on the PCM audio result buffer. To turn off this feature, please use ```-n0``` argument.
+
+To enable normalization in the _Player_ interface, instantiate the player like:
+
+```javascript
+var player = new Player(LAA, { normalization: true });
+```

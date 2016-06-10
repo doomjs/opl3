@@ -1,6 +1,6 @@
 {
   "name": "opl3",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "OPL3 emulator library",
   "main": "index.js",
   "preferGlobal": true,
@@ -44,6 +44,7 @@
     "jsmidgen": "^0.1.5",
     "lame": "^1.2.3",
     "mkdirp": "^0.5.1",
+    "numeral": "^1.5.3",
     "ogg": "^1.2.4",
     "progress": "^1.1.8",
     "speaker": "^0.3.0",
