@@ -1,6 +1,6 @@
 {
   "name": "opl3",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "OPL3 emulator library",
   "main": "index.js",
   "preferGlobal": true,
@@ -27,7 +27,8 @@
     "laa",
     "mus",
     "dro",
-    "imf"
+    "imf",
+    "raw"
   ],
   "author": "IDDQD",
   "license": "MIT",

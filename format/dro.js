@@ -9,7 +9,7 @@ extend(DRO.prototype, {
     hardwareType: ['OPL2', 'Dual OPL2', 'OPL3'],
     load: function(buffer){
         var header = new Buffer(buffer.buffer).slice(0, 8).toString();
-        if (header != 'DBRAWOPL') throw new Error('Buffer is not a DRO file');
+        if (header != 'DBRAWOPL') throw new Error('Buffer is not a "DOSBox Raw OPL" file');
         
         var buffer = this.data = new DataView(buffer.buffer);
         this.version = 'v' + buffer.getUint16(8, true) + '.' + buffer.getUint16(10, true);

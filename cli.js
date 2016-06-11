@@ -21,6 +21,7 @@ var LAA = require('./format/laa');
 var MUS = require('./format/mus');
 var DRO = require('./format/dro');
 var IMF = require('./format/imf');
+var RAW = require('./format/raw');
 var WAV = require('./wav.js').WAV;
 var package = require('./package.json');
 
@@ -34,6 +35,7 @@ var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u
 	.describe('mus', 'Use MUS format')
 	.describe('dro', 'Use DRO format')
 	.describe('imf', 'Use IMF format')
+	.describe('raw', 'Use RAW format')
 	.describe('normalize', 'PCM audio normalization (default on, turn off with -n0)')
 	.describe('play', 'Play after processing')
 	.describe('output', 'Output directory')
@@ -53,15 +55,14 @@ var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u
 if (argv.help) yargs.showHelp();
 else{
 	var start = Date.now();
-
-	console.log();
-	console.log(chalk.cyan('OPL3 emulator v' + package.version));
-	
 	if (process.argv.length < 3){
 		yargs.showHelp();
 		console.log(chalk.red('Input file required!'));
 		process.exit(1);
 	}
+	
+	console.log();
+	console.log(chalk.cyan('OPL3 emulator v' + package.version));
 	
 	if (typeof argv.normalize == 'undefined') argv.normalize = 1;
 	
@@ -104,6 +105,7 @@ else{
 				else if (argv.mus || filename.split('.').pop().toLowerCase() == 'mus') midiFormat = MUS;
 				else if (argv.dro || filename.split('.').pop().toLowerCase() == 'dro') midiFormat = DRO;
 				else if (argv.imf || filename.split('.').pop().toLowerCase() == 'imf') midiFormat = IMF;
+				else if (argv.raw || filename.split('.').pop().toLowerCase() == 'raw') midiFormat = RAW;
 				else{
 					console.log(chalk.red('Unknown file format!'));
 					process.exit(1);
@@ -127,6 +129,7 @@ else{
 						var player = new midiFormat(new OPL3(), null, Midi, argv.mid && !(argv.wav || argv.mp3 || argv.ogg || argv.play));
 						player.load(new Uint8Array(buffer));
 						
+						var perc = 0;
 						var dlen = 0;
 						var fn = function(){
 							var t = Date.now();
@@ -134,7 +137,8 @@ else{
 								var d = player.refresh();
 								var n = 4 * ((49700 * d) | 0);
 
-								bar.update(player.position / buffer.length);
+								perc = player.position / buffer.length;
+								bar.update(perc);
 
 								len += n;
 								dlen += d;
@@ -149,7 +153,7 @@ else{
 								if (Date.now() - t > 100) return setImmediate(fn);
 							}
 							
-							bar.update(1);
+							if (perc < 1) bar.update(1);
 						
 							bufferWriter.end();
 							pcmBuffer = bufferWriter.getContents();

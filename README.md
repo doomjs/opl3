@@ -9,7 +9,7 @@ Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozen
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.3.2
+OPL3 emulator v0.3.3
 Usage: opl3 <input file> [OPTIONS]
 
 Options:
@@ -21,6 +21,7 @@ Options:
   --mus            Use MUS format
   --dro            Use DRO format
   --imf            Use IMF format
+  --raw            Use RAW format
   -h, --help       You read that just now
   -n, --normalize  PCM audio normalization (default on, turn off with -n0)
   -p, --play       Play after processing
@@ -62,10 +63,11 @@ player.load(fs.readFileSync('./laa/dott logo.laa'), function(err, result){
 
 ## Supported format types
 
-* LAA: LucasArts music format
-* MUS: Doom music format
-* DRO: DosBox RAW OPL format
+* LAA: LucasArts music
+* MUS: Doom music
+* DRO: DosBox RAW OPL
 * IMF: Id Music Format
+* RAW: Rdos Raw OPL Capture
 
 ## Supported audio export formats
 

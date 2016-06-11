@@ -4,7 +4,8 @@ module.exports = {
         LAA: require('./format/laa'),
         MUS: require('./format/mus'),
         DRO: require('./format/dro'),
-        IMF: require('./format/imf')
+        IMF: require('./format/imf'),
+        RAW: require('./format/raw')
     },
     WAV: require('./wav').WAV,
     Player: function Player(format, options){
