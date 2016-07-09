@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>OPL3</title>
+	<script type="text/javascript" src="../dist/opl3.js"></script>
+</head>
+<body>
+	<script type="text/javascript">
+        fetch('data/D_INTRO.mus').then(function(res){
+            return res.arrayBuffer();
+        }).then(function(mus){
+            fetch('data/GENMIDI.OP2').then(function(res){
+                return res.arrayBuffer();
+            }).then(function(genmidi){
+                var player = new OPL3.Player(OPL3.format.MUS, {
+                    instruments: genmidi,
+                    prebuffer: 3000,
+                    volume: 3
+                });
+                player.play(mus);
+                player.on('progress', function(){
+                    document.body.innerHTML = player.position + 'ms / ' + player.length + 'ms';
+                });
+                player.on('position', function(ms){
+                    document.body.innerHTML = ms + 'ms / ' + player.length + 'ms';
+                });
+            });
+        });
+	</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
   "name": "opl3",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "OPL3 emulator library",
   "main": "index.js",
   "preferGlobal": true,
@@ -8,6 +8,8 @@
     "opl3": "cli.js"
   },
   "scripts": {
+    "bundle": "browserify index.js --standalone OPL3 | derequire > dist/opl3.js",
+    "postbundle": "uglifyjs dist/opl3.js > dist/opl3.min.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -43,18 +45,24 @@
     "extend": "^3.0.0",
     "glob": "^7.0.3",
     "jsmidgen": "^0.1.5",
-    "lame": "^1.2.3",
     "mkdirp": "^0.5.1",
     "numeral": "^1.5.3",
-    "ogg": "^1.2.4",
     "progress": "^1.1.8",
-    "speaker": "^0.3.0",
+    "setimmediate": "^1.0.4",
     "stream-buffers": "^3.0.0",
-    "vorbis": "^0.2.1",
+    "wad-genmidi": "^0.1.0",
     "wav": "^1.0.0",
     "yargs": "^4.6.0"
   },
+  "optionalDependencies": {
+    "lame": "^1.2.4",
+    "ogg": "^1.2.5",
+    "speaker": "^0.3.0",
+    "vorbis": "^0.2.1"
+  },
   "devDependencies": {
-    "eslint": "^2.8.0"
+    "browserify": "^13.0.1",
+    "eslint": "^2.8.0",
+    "uglify-js": "^2.6.4"
   }
 }

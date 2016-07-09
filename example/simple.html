@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>OPL3</title>
+	<script type="text/javascript" src="../dist/opl3.js"></script>
+</head>
+<body>
+	<script type="text/javascript">
+		fetch('data/D_INTRO.mus').then(function(res){
+            return res.arrayBuffer();
+        }).then(function(mus){
+            fetch('data/GENMIDI.OP2').then(function(res){
+                return res.arrayBuffer();
+            }).then(function(genmidi){
+                var player = new OPL3.Player(OPL3.format.MUS, {
+                    normalization: true,
+                    instruments: genmidi
+                });
+                player.load(mus, function(err, buffer){
+                    if (!err){
+                        var wav = OPL3.WAV(buffer, 49700);
+                        var blob = new Blob([wav], { type: 'audio/wav' });
+                        var url = URL.createObjectURL(blob);
+                        document.body.innerHTML += '<br><a href="' + url + '">Play WAV!</a>';
+                    }
+                });
+                player.on('error', function(err){
+                    document.body.innerHTML = '<pre>' + err.stack + '</pre>';
+                });
+                player.on('progress', function(perc){
+                    document.body.innerHTML = 'Processing ' + perc + '%';
+                });
+                player.on('normalization', function(perc){
+                    document.body.innerHTML = 'Normalization ' + perc + '%';
+                });
+                player.on('gain', function(gain){
+                    document.body.innerHTML = 'Normalization gain x' + (Math.floor(gain * 10) / 10);
+                });
+            });
+        });
+	</script>
+</body>
+</html>

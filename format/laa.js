@@ -1,11 +1,14 @@
 var extend = require('extend');
 
-function LAA(opl, instruments, Midi){
+function LAA(opl, options){
+    options = options || {};
+
     this.opl = opl;
     this.channels = [];
     this.tracks = [];
     this.adlib_data = new Int32Array(256);
     
+    var Midi = options.Midi;
     if (typeof Midi != 'undefined'){
         this.Midi = Midi;
         this.midiFile = new Midi.File();

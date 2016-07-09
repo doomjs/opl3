@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>OPL3</title>
+	<script type="text/javascript" src="../dist/opl3.js"></script>
+	<script type="text/javascript" src="./pico.min.js"></script>
+</head>
+<body>
+	<script type="text/javascript">
+		fetch('data/D_INTRO.mus').then(function(res){
+            return res.arrayBuffer();
+        }).then(function(mus){
+            fetch('data/GENMIDI.OP2').then(function(res){
+                return res.arrayBuffer();
+            }).then(function(genmidi){
+                var player = new OPL3.Player(OPL3.format.MUS, {
+                    bufferSize: Pico.bufferSize,
+                    sampleRate: Pico.sampleRate,
+                    bitDepth: 32,
+                    instruments: genmidi
+                });
+                player.load(mus);
+                var queue = [];
+                Pico.play(function(e){
+                    var out = e.buffers;
+
+                    var tmp = queue.shift();
+                    if (tmp){
+                        var dv = new DataView(tmp);
+                        for (var i = 0, offset = 0; i < e.bufferSize; i++, offset += 8){
+                            out[0][i] = dv.getFloat32(offset, true);
+                            out[1][i] = dv.getFloat32(offset + 4, true);
+                        }
+                    }else{
+                        var silence = new Float32Array(e.bufferSize);
+                        out[0].set(silence);
+                        out[1].set(silence);
+                    }
+                });
+                player.on('data', function(buffer){
+                    queue.push(buffer);
+                });
+            });
+        });
+	</script>
+</body>
+</html>

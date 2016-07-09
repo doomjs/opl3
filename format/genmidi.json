@@ -1,5 +1,5 @@
 {
-    "lump": {},
+    "header": "#OPL_II#",
     "instruments": [
         {
             "name": "Acoustic Grand Piano",
@@ -7702,5 +7702,5 @@
             ]
         }
     ],
-    "header": "#OPL_II#"
+    "lump": {}
 }

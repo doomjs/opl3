@@ -1,0 +1,43 @@
+{
+  "name": "opl3",
+  "description": "OPL3 emulator library",
+  "main": "dist/opl3.js",
+  "authors": [
+    "IDDQD"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "opl",
+    "opl3",
+    "YMF262",
+    "javascript",
+    "sound",
+    "blaster",
+    "music",
+    "doom",
+    "dosbox",
+    "laa",
+    "mus",
+    "dro",
+    "imf",
+    "raw"
+  ],
+  "homepage": "https://github.com/doomjs/opl3",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests",
+    "format",
+    "imf",
+    "laa",
+    "lib",
+    "mus",
+    "raw",
+    "utils",
+    "cli.js",
+    "index.js",
+    "package.json"
+  ]
+}
