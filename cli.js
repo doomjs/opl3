@@ -224,7 +224,7 @@ else{
 						mkdirp.sync(path.dirname(wavFilename));
 						wavFilename = path.resolve(wavFilename);
 						
-						fs.writeFile(wavFilename, new Buffer(WAV(pcmBuffer, 49700)), function(err){
+						fs.writeFile(wavFilename, new Buffer(WAV(pcmBuffer, { sampleRate: 49700, bitDepth: 16 })), function(err){
 							console.log('WAV exported to ' + chalk.yellow(wavFilename));
 							callback();
 						});

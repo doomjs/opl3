@@ -1,4 +1,5 @@
 .vscode
+.npmrc
 node_modules
 laa
 mus

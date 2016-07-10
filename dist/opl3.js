@@ -78,7 +78,7 @@ extend(DRO.prototype, {
     }
 });
 }).call(this,_dereq_("buffer").Buffer)
-},{"buffer":16,"extend":21}],2:[function(_dereq_,module,exports){
+},{"buffer":15,"extend":20}],2:[function(_dereq_,module,exports){
 module.exports={
     "header": "#OPL_II#",
     "instruments": [
@@ -7842,7 +7842,7 @@ extend(IMF.prototype, {
         this.opl.write(a, r, v);
     }
 });
-},{"extend":21}],4:[function(_dereq_,module,exports){
+},{"extend":20}],4:[function(_dereq_,module,exports){
 var extend = _dereq_('extend');
 
 function LAA(opl, options){
@@ -8514,7 +8514,7 @@ function MidiTrack(){
 
 }
 
-},{"extend":21}],5:[function(_dereq_,module,exports){
+},{"extend":20}],5:[function(_dereq_,module,exports){
 var extend = _dereq_('extend');
 var GENMIDI = _dereq_('wad-genmidi');
 
@@ -9303,7 +9303,7 @@ extend(MUS.prototype, {
         0x3fa, 0x3fc, 0x3fe, 0x36c
     ]
 });
-},{"./genmidi.json":2,"extend":21,"wad-genmidi":48}],6:[function(_dereq_,module,exports){
+},{"./genmidi.json":2,"extend":20,"wad-genmidi":47}],6:[function(_dereq_,module,exports){
 (function (Buffer){
 var extend = _dereq_('extend');
 
@@ -9367,7 +9367,7 @@ extend(RAW.prototype, {
     }
 });
 }).call(this,_dereq_("buffer").Buffer)
-},{"buffer":16,"extend":21}],7:[function(_dereq_,module,exports){
+},{"buffer":15,"extend":20}],7:[function(_dereq_,module,exports){
 module.exports = {
     OPL3: _dereq_('./lib/opl3'),
     format: {
@@ -9377,12 +9377,12 @@ module.exports = {
         IMF: _dereq_('./format/imf'),
         RAW: _dereq_('./format/raw')
     },
-    WAV: _dereq_('./lib/wav'),
+    WAV: _dereq_('wav-arraybuffer'),
     ConvertTo32Bit: _dereq_('./lib/convertto32bit'),
     Normalizer: _dereq_('./lib/normalizer'),
     Player: _dereq_('./lib/player')
 };
-},{"./format/dro":1,"./format/imf":3,"./format/laa":4,"./format/mus":5,"./format/raw":6,"./lib/convertto32bit":8,"./lib/normalizer":9,"./lib/opl3":10,"./lib/player":11,"./lib/wav":12}],8:[function(_dereq_,module,exports){
+},{"./format/dro":1,"./format/imf":3,"./format/laa":4,"./format/mus":5,"./format/raw":6,"./lib/convertto32bit":8,"./lib/normalizer":9,"./lib/opl3":10,"./lib/player":11,"wav-arraybuffer":48}],8:[function(_dereq_,module,exports){
 (function (Buffer){
 var Transform = _dereq_('stream').Transform;
 var util = _dereq_('util');
@@ -9403,7 +9403,7 @@ ConvertTo32Bit.prototype._transform = function(chunk, encoding, done){
 util.inherits(ConvertTo32Bit, Transform);
 module.exports = ConvertTo32Bit;
 }).call(this,_dereq_("buffer").Buffer)
-},{"buffer":16,"stream":28,"util":47}],9:[function(_dereq_,module,exports){
+},{"buffer":15,"stream":27,"util":46}],9:[function(_dereq_,module,exports){
 var Transform = _dereq_('stream').Transform;
 var WritableStreamBuffer = _dereq_('stream-buffers').WritableStreamBuffer;
 var util = _dereq_('util');
@@ -9479,7 +9479,7 @@ function Normalizer(bitDepth){
 
 util.inherits(Normalizer, Transform);
 module.exports = Normalizer;
-},{"stream":28,"stream-buffers":42,"util":47}],10:[function(_dereq_,module,exports){
+},{"stream":27,"stream-buffers":41,"util":46}],10:[function(_dereq_,module,exports){
 var util = _dereq_('util');
 var extend = _dereq_('extend');
 
@@ -10841,7 +10841,7 @@ var EnvelopeGeneratorData = {
     ]
 };
 
-},{"extend":21,"util":47}],11:[function(_dereq_,module,exports){
+},{"extend":20,"util":46}],11:[function(_dereq_,module,exports){
 (function (process,Buffer){
 var Readable = _dereq_('stream').Readable;
 var util = _dereq_('util');
@@ -11160,89 +11160,7 @@ function Player(format, options){
 util.inherits(Player, Readable);
 module.exports = Player;
 }).call(this,_dereq_('_process'),_dereq_("buffer").Buffer)
-},{"./convertto32bit":8,"./normalizer":9,"./opl3":10,"_process":26,"buffer":16,"setimmediate":27,"stream":28,"stream-buffers":42,"util":47}],12:[function(_dereq_,module,exports){
-function WAV(data, sampleRate, bitDepth){
-    bitDepth = bitDepth || 16;
-    if (data instanceof ArrayBuffer) data = new Uint8Array(data);
-    var buffer = new Uint8Array(data.byteLength + 44);
-
-    var blockAlign = (2 * bitDepth) >> 3;
-    var byteRate = blockAlign * sampleRate;
-    var subChunk2Size = data.length * (bitDepth >> 3) / 2;
-    var chunkSize = 36 + subChunk2Size;
-
-    //RIFF
-    buffer[0] = 0x52;
-    buffer[1] = 0x49;
-    buffer[2] = 0x46;
-    buffer[3] = 0x46;
-
-    buffer[4] = chunkSize & 0xff;
-    buffer[5] = (chunkSize >> 8) & 0xff;
-    buffer[6] = (chunkSize >> 16) & 0xff;
-    buffer[7] = (chunkSize >> 24) & 0xff;
-
-    //WAVE
-    buffer[8] = 0x57;
-    buffer[9] = 0x41;
-    buffer[10] = 0x56;
-    buffer[11] = 0x45;
-
-    //fmt
-    buffer[12] = 0x66;
-    buffer[13] = 0x6d;
-    buffer[14] = 0x74;
-    buffer[15] = 0x20;
-
-    //SubChunk1Size
-    buffer[16] = 16;
-    buffer[17] = 0;
-    buffer[18] = 0;
-    buffer[19] = 0;
-
-    //audio format
-    buffer[20] = bitDepth == 32 ? 3 : 1;
-    buffer[21] = 0;
-
-    //num channels
-    buffer[22] = 2;
-    buffer[23] = 0;
-
-    buffer[24] = sampleRate & 0xff;
-    buffer[25] = (sampleRate >> 8) & 0xff;
-    buffer[26] = (sampleRate >> 16) & 0xff;
-    buffer[27] = (sampleRate >> 24) & 0xff;
-
-    buffer[28] = byteRate & 0xff;
-    buffer[29] = (byteRate >> 8) & 0xff;
-    buffer[30] = (byteRate >> 16) & 0xff;
-    buffer[31] = (byteRate >> 24) & 0xff;
-
-    buffer[32] = blockAlign & 0xff;
-    buffer[33] = (blockAlign >> 8) & 0xff;
-
-    //bitsPerSample
-    buffer[34] = bitDepth;
-    buffer[35] = 0;
-
-    //data
-    buffer[36] = 0x64;
-    buffer[37] = 0x61;
-    buffer[38] = 0x74;
-    buffer[39] = 0x61;
-
-    buffer[40] = subChunk2Size & 0xff;
-    buffer[41] = (subChunk2Size >> 8) & 0xff;
-    buffer[42] = (subChunk2Size >> 16) & 0xff;
-    buffer[43] = (subChunk2Size >> 24) & 0xff;
-
-    buffer.set(data, 44);
-
-	return buffer;
-}
-
-module.exports = WAV;
-},{}],13:[function(_dereq_,module,exports){
+},{"./convertto32bit":8,"./normalizer":9,"./opl3":10,"_process":25,"buffer":15,"setimmediate":26,"stream":27,"stream-buffers":41,"util":46}],12:[function(_dereq_,module,exports){
 'use strict'
 
 exports.toByteArray = toByteArray
@@ -11353,9 +11271,9 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],14:[function(_dereq_,module,exports){
+},{}],13:[function(_dereq_,module,exports){
 
-},{}],15:[function(_dereq_,module,exports){
+},{}],14:[function(_dereq_,module,exports){
 (function (global){
 'use strict';
 
@@ -11467,7 +11385,7 @@ exports.allocUnsafeSlow = function allocUnsafeSlow(size) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"buffer":16}],16:[function(_dereq_,module,exports){
+},{"buffer":15}],15:[function(_dereq_,module,exports){
 (function (global){
 /*!
  * The buffer module from node.js, for the browser.
@@ -13182,14 +13100,14 @@ function isnan (val) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":13,"ieee754":22,"isarray":17}],17:[function(_dereq_,module,exports){
+},{"base64-js":12,"ieee754":21,"isarray":16}],16:[function(_dereq_,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],18:[function(_dereq_,module,exports){
+},{}],17:[function(_dereq_,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -13300,7 +13218,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":_dereq_("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":24}],19:[function(_dereq_,module,exports){
+},{"../../is-buffer/index.js":23}],18:[function(_dereq_,module,exports){
 DataView.prototype.getString = function(offset, length){
     var end = typeof length == 'number' ? offset + length : this.byteLength;
     var text = '';
@@ -13314,7 +13232,7 @@ DataView.prototype.getString = function(offset, length){
 
     return text;
 };
-},{}],20:[function(_dereq_,module,exports){
+},{}],19:[function(_dereq_,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -13618,7 +13536,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],21:[function(_dereq_,module,exports){
+},{}],20:[function(_dereq_,module,exports){
 'use strict';
 
 var hasOwn = Object.prototype.hasOwnProperty;
@@ -13706,7 +13624,7 @@ module.exports = function extend() {
 };
 
 
-},{}],22:[function(_dereq_,module,exports){
+},{}],21:[function(_dereq_,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -13792,7 +13710,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],23:[function(_dereq_,module,exports){
+},{}],22:[function(_dereq_,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -13817,7 +13735,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],24:[function(_dereq_,module,exports){
+},{}],23:[function(_dereq_,module,exports){
 /**
  * Determine if an object is Buffer
  *
@@ -13836,7 +13754,7 @@ module.exports = function (obj) {
     ))
 }
 
-},{}],25:[function(_dereq_,module,exports){
+},{}],24:[function(_dereq_,module,exports){
 (function (process){
 'use strict';
 
@@ -13883,7 +13801,7 @@ function nextTick(fn, arg1, arg2, arg3) {
 }
 
 }).call(this,_dereq_('_process'))
-},{"_process":26}],26:[function(_dereq_,module,exports){
+},{"_process":25}],25:[function(_dereq_,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -14004,7 +13922,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],27:[function(_dereq_,module,exports){
+},{}],26:[function(_dereq_,module,exports){
 (function (process,global){
 (function (global, undefined) {
     "use strict";
@@ -14183,7 +14101,7 @@ process.umask = function() { return 0; };
 }(typeof self === "undefined" ? typeof global === "undefined" ? this : global : self));
 
 }).call(this,_dereq_('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"_process":26}],28:[function(_dereq_,module,exports){
+},{"_process":25}],27:[function(_dereq_,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -14312,12 +14230,12 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":20,"inherits":23,"readable-stream/duplex.js":30,"readable-stream/passthrough.js":36,"readable-stream/readable.js":37,"readable-stream/transform.js":38,"readable-stream/writable.js":39}],29:[function(_dereq_,module,exports){
-arguments[4][17][0].apply(exports,arguments)
-},{"dup":17}],30:[function(_dereq_,module,exports){
+},{"events":19,"inherits":22,"readable-stream/duplex.js":29,"readable-stream/passthrough.js":35,"readable-stream/readable.js":36,"readable-stream/transform.js":37,"readable-stream/writable.js":38}],28:[function(_dereq_,module,exports){
+arguments[4][16][0].apply(exports,arguments)
+},{"dup":16}],29:[function(_dereq_,module,exports){
 module.exports = _dereq_("./lib/_stream_duplex.js")
 
-},{"./lib/_stream_duplex.js":31}],31:[function(_dereq_,module,exports){
+},{"./lib/_stream_duplex.js":30}],30:[function(_dereq_,module,exports){
 // a duplex stream is just a stream that is both readable and writable.
 // Since JS doesn't have multiple prototypal inheritance, this class
 // prototypally inherits from Readable, and then parasitically from
@@ -14393,7 +14311,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":33,"./_stream_writable":35,"core-util-is":18,"inherits":23,"process-nextick-args":25}],32:[function(_dereq_,module,exports){
+},{"./_stream_readable":32,"./_stream_writable":34,"core-util-is":17,"inherits":22,"process-nextick-args":24}],31:[function(_dereq_,module,exports){
 // a passthrough stream.
 // basically just the most minimal sort of Transform stream.
 // Every written chunk gets output as-is.
@@ -14420,7 +14338,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":34,"core-util-is":18,"inherits":23}],33:[function(_dereq_,module,exports){
+},{"./_stream_transform":33,"core-util-is":17,"inherits":22}],32:[function(_dereq_,module,exports){
 (function (process){
 'use strict';
 
@@ -15316,7 +15234,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,_dereq_('_process'))
-},{"./_stream_duplex":31,"_process":26,"buffer":16,"buffer-shims":15,"core-util-is":18,"events":20,"inherits":23,"isarray":29,"process-nextick-args":25,"string_decoder/":44,"util":14}],34:[function(_dereq_,module,exports){
+},{"./_stream_duplex":30,"_process":25,"buffer":15,"buffer-shims":14,"core-util-is":17,"events":19,"inherits":22,"isarray":28,"process-nextick-args":24,"string_decoder/":43,"util":13}],33:[function(_dereq_,module,exports){
 // a transform stream is a readable/writable stream where you do
 // something with the data.  Sometimes it's called a "filter",
 // but that's not a great name for it, since that implies a thing where
@@ -15497,7 +15415,7 @@ function done(stream, er) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":31,"core-util-is":18,"inherits":23}],35:[function(_dereq_,module,exports){
+},{"./_stream_duplex":30,"core-util-is":17,"inherits":22}],34:[function(_dereq_,module,exports){
 (function (process){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
@@ -16026,10 +15944,10 @@ function CorkedRequest(state) {
   };
 }
 }).call(this,_dereq_('_process'))
-},{"./_stream_duplex":31,"_process":26,"buffer":16,"buffer-shims":15,"core-util-is":18,"events":20,"inherits":23,"process-nextick-args":25,"util-deprecate":45}],36:[function(_dereq_,module,exports){
+},{"./_stream_duplex":30,"_process":25,"buffer":15,"buffer-shims":14,"core-util-is":17,"events":19,"inherits":22,"process-nextick-args":24,"util-deprecate":44}],35:[function(_dereq_,module,exports){
 module.exports = _dereq_("./lib/_stream_passthrough.js")
 
-},{"./lib/_stream_passthrough.js":32}],37:[function(_dereq_,module,exports){
+},{"./lib/_stream_passthrough.js":31}],36:[function(_dereq_,module,exports){
 (function (process){
 var Stream = (function (){
   try {
@@ -16049,13 +15967,13 @@ if (!process.browser && process.env.READABLE_STREAM === 'disable' && Stream) {
 }
 
 }).call(this,_dereq_('_process'))
-},{"./lib/_stream_duplex.js":31,"./lib/_stream_passthrough.js":32,"./lib/_stream_readable.js":33,"./lib/_stream_transform.js":34,"./lib/_stream_writable.js":35,"_process":26}],38:[function(_dereq_,module,exports){
+},{"./lib/_stream_duplex.js":30,"./lib/_stream_passthrough.js":31,"./lib/_stream_readable.js":32,"./lib/_stream_transform.js":33,"./lib/_stream_writable.js":34,"_process":25}],37:[function(_dereq_,module,exports){
 module.exports = _dereq_("./lib/_stream_transform.js")
 
-},{"./lib/_stream_transform.js":34}],39:[function(_dereq_,module,exports){
+},{"./lib/_stream_transform.js":33}],38:[function(_dereq_,module,exports){
 module.exports = _dereq_("./lib/_stream_writable.js")
 
-},{"./lib/_stream_writable.js":35}],40:[function(_dereq_,module,exports){
+},{"./lib/_stream_writable.js":34}],39:[function(_dereq_,module,exports){
 'use strict';
 
 module.exports = {
@@ -16065,7 +15983,7 @@ module.exports = {
   DEFAULT_CHUNK_SIZE: 1024
 };
 
-},{}],41:[function(_dereq_,module,exports){
+},{}],40:[function(_dereq_,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -16171,14 +16089,14 @@ var ReadableStreamBuffer = module.exports = function(opts) {
 util.inherits(ReadableStreamBuffer, stream.Readable);
 
 }).call(this,_dereq_("buffer").Buffer)
-},{"./constants":40,"buffer":16,"stream":28,"util":47}],42:[function(_dereq_,module,exports){
+},{"./constants":39,"buffer":15,"stream":27,"util":46}],41:[function(_dereq_,module,exports){
 'use strict';
 
 module.exports = _dereq_('./constants');
 module.exports.ReadableStreamBuffer = _dereq_('./readable_streambuffer');
 module.exports.WritableStreamBuffer = _dereq_('./writable_streambuffer');
 
-},{"./constants":40,"./readable_streambuffer":41,"./writable_streambuffer":43}],43:[function(_dereq_,module,exports){
+},{"./constants":39,"./readable_streambuffer":40,"./writable_streambuffer":42}],42:[function(_dereq_,module,exports){
 (function (Buffer){
 'use strict';
 
@@ -16254,7 +16172,7 @@ var WritableStreamBuffer = module.exports = function(opts) {
 util.inherits(WritableStreamBuffer, stream.Writable);
 
 }).call(this,_dereq_("buffer").Buffer)
-},{"./constants":40,"buffer":16,"stream":28,"util":47}],44:[function(_dereq_,module,exports){
+},{"./constants":39,"buffer":15,"stream":27,"util":46}],43:[function(_dereq_,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -16477,7 +16395,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":16}],45:[function(_dereq_,module,exports){
+},{"buffer":15}],44:[function(_dereq_,module,exports){
 (function (global){
 
 /**
@@ -16548,14 +16466,14 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],46:[function(_dereq_,module,exports){
+},{}],45:[function(_dereq_,module,exports){
 module.exports = function isBuffer(arg) {
   return arg && typeof arg === 'object'
     && typeof arg.copy === 'function'
     && typeof arg.fill === 'function'
     && typeof arg.readUInt8 === 'function';
 }
-},{}],47:[function(_dereq_,module,exports){
+},{}],46:[function(_dereq_,module,exports){
 (function (process,global){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -17145,7 +17063,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,_dereq_('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":46,"_process":26,"inherits":23}],48:[function(_dereq_,module,exports){
+},{"./support/isBuffer":45,"_process":25,"inherits":22}],47:[function(_dereq_,module,exports){
 _dereq_('dataview-getstring');
 
 function VoiceData(data){
@@ -17192,5 +17110,49 @@ function GENMIDI(lump){
 }
 
 module.exports = GENMIDI;
-},{"dataview-getstring":19}]},{},[7])(7)
+},{"dataview-getstring":18}],48:[function(_dereq_,module,exports){
+(function (Buffer){
+var markers = {
+    RIFF: new Buffer('RIFF'),
+    WAVE: new Buffer('WAVE'),
+    fmt: new Buffer('fmt '),
+    data: new Buffer('data')
+};
+
+function WAV(data, options){
+    options = options || {};
+    var sampleRate = options.sampleRate || 44100;
+    var bitDepth = options.bitDepth || 32;
+    var channels = options.channels || 2;
+
+    data = new Buffer(data.buffer || data);
+    var output = new Buffer(data.byteLength + 44);
+    var dv = new DataView(output.buffer);
+
+    var blockAlign = (channels * bitDepth) >> 3;
+    var byteRate = blockAlign * sampleRate;
+    var subChunk2Size = (data.byteLength / (bitDepth == 32 ? 4 : 2)) * channels * (bitDepth >> 3);
+    var chunkSize = 36 + subChunk2Size;
+
+    output.set(markers.RIFF, 0);
+    dv.setUint32(4, chunkSize, true);
+    output.set(markers.WAVE, 8);
+    output.set(markers.fmt, 12);
+    dv.setUint32(16, 16, true);
+    dv.setUint16(20, bitDepth == 32 ? 3 : 1, true);
+    dv.setUint16(22, channels, true);
+    dv.setUint32(24, sampleRate, true);
+    dv.setUint32(28, byteRate, true);
+    dv.setUint16(32, blockAlign, true);
+    dv.setUint16(34, bitDepth, true);
+    output.set(markers.data, 36);
+    dv.setUint32(40, subChunk2Size, true);
+    output.set(data, 44);
+
+	return output.buffer;
+}
+
+module.exports = WAV;
+}).call(this,_dereq_("buffer").Buffer)
+},{"buffer":15}]},{},[7])(7)
 });

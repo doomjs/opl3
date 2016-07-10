@@ -7,7 +7,7 @@ module.exports = {
         IMF: require('./format/imf'),
         RAW: require('./format/raw')
     },
-    WAV: require('./lib/wav'),
+    WAV: require('wav-arraybuffer'),
     ConvertTo32Bit: require('./lib/convertto32bit'),
     Normalizer: require('./lib/normalizer'),
     Player: require('./lib/player')

@@ -211,11 +211,9 @@ Emitted on realtime audio playback, returns audio playback position in milliseco
 
 ```Normalizer``` is a ```Transform``` stream class, use this to normalize PCM audio data. Used internally in ```Player``` class.
 
-## WAV(data, sampleRate)
+## WAV(data[, options])
 
-* ```data``` &lt;Buffer&gt; | &lt;ArrayBuffer&gt; | &lt;Uint8Array&gt; PCM audio data
-* ```sampleRate``` &lt;number&gt; Sample rate
-
+See more details [here](https://github.com/doomjs/wav-arraybuffer).
 Use this function to generate WAV audio format buffer from PCM audio data.
 
 ## Supported format types

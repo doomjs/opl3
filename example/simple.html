@@ -18,7 +18,7 @@
                 });
                 player.load(mus, function(err, buffer){
                     if (!err){
-                        var wav = OPL3.WAV(buffer, 49700);
+                        var wav = OPL3.WAV(buffer, { sampleRate: 49700, bitDepth: 16 });
                         var blob = new Blob([wav], { type: 'audio/wav' });
                         var url = URL.createObjectURL(blob);
                         document.body.innerHTML += '<br><a href="' + url + '">Play WAV!</a>';
