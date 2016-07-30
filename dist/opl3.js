@@ -78,7 +78,7 @@ extend(DRO.prototype, {
     }
 });
 }).call(this,_dereq_("buffer").Buffer)
-},{"buffer":15,"extend":20}],2:[function(_dereq_,module,exports){
+},{"buffer":13,"extend":18}],2:[function(_dereq_,module,exports){
 module.exports={
     "header": "#OPL_II#",
     "instruments": [
@@ -7842,7 +7842,7 @@ extend(IMF.prototype, {
         this.opl.write(a, r, v);
     }
 });
-},{"extend":20}],4:[function(_dereq_,module,exports){
+},{"extend":18}],4:[function(_dereq_,module,exports){
 var extend = _dereq_('extend');
 
 function LAA(opl, options){
@@ -8514,7 +8514,7 @@ function MidiTrack(){
 
 }
 
-},{"extend":20}],5:[function(_dereq_,module,exports){
+},{"extend":18}],5:[function(_dereq_,module,exports){
 var extend = _dereq_('extend');
 var GENMIDI = _dereq_('wad-genmidi');
 
@@ -9303,7 +9303,7 @@ extend(MUS.prototype, {
         0x3fa, 0x3fc, 0x3fe, 0x36c
     ]
 });
-},{"./genmidi.json":2,"extend":20,"wad-genmidi":47}],6:[function(_dereq_,module,exports){
+},{"./genmidi.json":2,"extend":18,"wad-genmidi":47}],6:[function(_dereq_,module,exports){
 (function (Buffer){
 var extend = _dereq_('extend');
 
@@ -9367,7 +9367,7 @@ extend(RAW.prototype, {
     }
 });
 }).call(this,_dereq_("buffer").Buffer)
-},{"buffer":15,"extend":20}],7:[function(_dereq_,module,exports){
+},{"buffer":13,"extend":18}],7:[function(_dereq_,module,exports){
 module.exports = {
     OPL3: _dereq_('./lib/opl3'),
     format: {
@@ -9378,108 +9378,11 @@ module.exports = {
         RAW: _dereq_('./format/raw')
     },
     WAV: _dereq_('wav-arraybuffer'),
-    ConvertTo32Bit: _dereq_('./lib/convertto32bit'),
-    Normalizer: _dereq_('./lib/normalizer'),
+    ConvertTo32Bit: _dereq_('pcm-bitdepth-converter').From16To32Bit,
+    Normalizer: _dereq_('pcm-normalizer'),
     Player: _dereq_('./lib/player')
 };
-},{"./format/dro":1,"./format/imf":3,"./format/laa":4,"./format/mus":5,"./format/raw":6,"./lib/convertto32bit":8,"./lib/normalizer":9,"./lib/opl3":10,"./lib/player":11,"wav-arraybuffer":48}],8:[function(_dereq_,module,exports){
-(function (Buffer){
-var Transform = _dereq_('stream').Transform;
-var util = _dereq_('util');
-
-function ConvertTo32Bit(){
-    Transform.call(this);
-}
-
-ConvertTo32Bit.prototype._transform = function(chunk, encoding, done){
-    var b32 = new Float32Array(chunk.byteLength / 2);
-    var dv = new DataView(chunk.buffer);
-    for (var i = 0, offset = 0; offset < chunk.byteLength; i++, offset += 2){
-        b32[i] = dv.getInt16(offset, true) / 32768;
-    }
-    done(null, new Buffer(b32.buffer));
-};
-
-util.inherits(ConvertTo32Bit, Transform);
-module.exports = ConvertTo32Bit;
-}).call(this,_dereq_("buffer").Buffer)
-},{"buffer":15,"stream":27,"util":46}],9:[function(_dereq_,module,exports){
-var Transform = _dereq_('stream').Transform;
-var WritableStreamBuffer = _dereq_('stream-buffers').WritableStreamBuffer;
-var util = _dereq_('util');
-
-function Normalizer(bitDepth){
-    Transform.call(this);
-    var self = this;
-
-    var WritableStreamBuffer = _dereq_('stream-buffers').WritableStreamBuffer;
-    var writer = new WritableStreamBuffer({
-        initialSize: (1024 * 1024),
-        incrementAmount: (512 * 1024)
-    });
-
-    var peak = 0;
-    var scale = 1;
-    var targetPeak = (bitDepth == 32 ? 1 : 32768);
-    var len = 0;
-
-    var bps = (bitDepth == 32 ? 4 : 2);
-    var getter = (bitDepth == 32 ? DataView.prototype.getFloat32 : DataView.prototype.getInt16);
-    var setter = (bitDepth == 32 ? DataView.prototype.setFloat32 : DataView.prototype.setInt16);
-
-    this._transform = function(chunk, encoding, done){
-        var dv = new DataView(chunk.buffer);
-        len += chunk.byteLength / bps;
-
-        for (var i = 0; i < chunk.byteLength; i += bps){
-            var p = Math.abs(getter.call(dv, i, true));
-            if (p > peak) peak = p;
-        }
-
-        writer.write(chunk);
-        done();
-    };
-
-    this._flush = function(done){
-        writer.end();
-        var pcmBuffer = writer.getContents();
-
-        var endFn = function(){
-            self.push(pcmBuffer);
-            done();
-        };
-
-        if (peak > 0){
-            scale = targetPeak / peak;
-            var dv = new DataView(pcmBuffer.buffer);
-
-            var i = 0;
-            var perc = 0;
-            var normPcm = function(){
-                var t = Date.now();
-
-                for (; i < pcmBuffer.byteLength; i += bps){
-                    setter.call(dv, i, Math.round(getter.call(dv, i, true) * scale), true);
-                    var p = Math.floor((i / pcmBuffer.byteLength) * 1000) / 10;
-                    if (p > perc){
-                        perc = p;
-                        self.emit('normalization', perc);
-                    }
-                    if (Date.now() - t > 1000) return setImmediate(normPcm);
-                }
-
-                self.emit('normalization', 100);
-                self.emit('gain', scale);
-                endFn();
-            };
-            normPcm();
-        }else endFn();
-    };
-}
-
-util.inherits(Normalizer, Transform);
-module.exports = Normalizer;
-},{"stream":27,"stream-buffers":41,"util":46}],10:[function(_dereq_,module,exports){
+},{"./format/dro":1,"./format/imf":3,"./format/laa":4,"./format/mus":5,"./format/raw":6,"./lib/opl3":8,"./lib/player":9,"pcm-bitdepth-converter":22,"pcm-normalizer":23,"wav-arraybuffer":48}],8:[function(_dereq_,module,exports){
 var util = _dereq_('util');
 var extend = _dereq_('extend');
 
@@ -9520,9 +9423,9 @@ extend(OPL3.prototype, {
         var converterScale = output instanceof Float32Array ? 32768 : 1;
 
         do{
-            var channelOutput;
+            var channelOutput, outputChannelNumber;
 
-            for (var outputChannelNumber = 0; outputChannelNumber < 4; outputChannelNumber++){
+            for (outputChannelNumber = 0; outputChannelNumber < 4; outputChannelNumber++){
                 this.outputBuffer[outputChannelNumber] = 0;
             }
 
@@ -9531,7 +9434,7 @@ extend(OPL3.prototype, {
                 for (var channelNumber = 0; channelNumber < 9; channelNumber++){
                     // Reads output from each OPL3 channel, and accumulates it in the output buffer:
                     channelOutput = this.channels[array][channelNumber].getChannelOutput();
-                    for (var outputChannelNumber = 0; outputChannelNumber < 4; outputChannelNumber++){
+                    for (outputChannelNumber = 0; outputChannelNumber < 4; outputChannelNumber++){
                         this.outputBuffer[outputChannelNumber] += channelOutput[outputChannelNumber];
                     }
                 }
@@ -9540,7 +9443,7 @@ extend(OPL3.prototype, {
             // Normalizes the output buffer after all channels have been added,
             // with a maximum of 18 channels,
             // and multiplies it to get the 16 bit signed output.
-            for (var outputChannelNumber = 0; outputChannelNumber < this.outputChannelNumber; outputChannelNumber++){
+            for (outputChannelNumber = 0; outputChannelNumber < this.outputChannelNumber; outputChannelNumber++){
                 output[offset + outputChannelNumber] = ((this.outputBuffer[outputChannelNumber] / 18) * 0x7FFF) / converterScale;
             }
 
@@ -9819,6 +9722,7 @@ extend(OPL3.prototype, {
         }
     },
     setRhythmMode: function(){
+        var i;
         if (this.ryt == 1){
             this.channels[0][6] = this.bassDrumChannel;
             this.channels[0][7] = this.highHatSnareDrumChannel;
@@ -9828,14 +9732,14 @@ extend(OPL3.prototype, {
             this.operators[0][0x12] = this.tomTomOperator;
             this.operators[0][0x15] = this.topCymbalOperator;
         }else{
-            for (var i = 6; i <= 8; i++) this.channels[0][i] = this.channels2op[0][i];
+            for (i = 6; i <= 8; i++) this.channels[0][i] = this.channels2op[0][i];
             this.operators[0][0x11] = this.highHatOperatorInNonRhythmMode;
             this.operators[0][0x14] = this.snareDrumOperatorInNonRhythmMode;
             this.operators[0][0x12] = this.tomTomOperatorInNonRhythmMode;
             this.operators[0][0x15] = this.topCymbalOperatorInNonRhythmMode;
         }
 
-        for (var i = 6; i <= 8; i++) this.channels[0][i].updateChannel();
+        for (i = 6; i <= 8; i++) this.channels[0][i].updateChannel();
     }
 });
 
@@ -10733,49 +10637,50 @@ var OperatorData = {
         new Float64Array(1024), new Float64Array(1024), new Float64Array(1024), new Float64Array(1024)
     ],
     loadWaveforms: function(waveforms){
+        var i, theta, x;
         // 1st waveform: sinusoid.
-        for (var i = 0, theta = 0; i < 1024; i++, theta += (2 * Math.PI / 1024)){
+        for (i = 0, theta = 0; i < 1024; i++, theta += (2 * Math.PI / 1024)){
             waveforms[0][i] = Math.sin(theta);
         }
 
         var sineTable = waveforms[0];
         // 2nd: first half of a sinusoid.
-        for (var i = 0; i < 512; i++){
+        for (i = 0; i < 512; i++){
             waveforms[1][i] = sineTable[i];
             waveforms[1][512 + i] = 0;
         }
 
         // 3rd: double positive sinusoid.
-        for (var i = 0; i < 512; i++){
+        for (i = 0; i < 512; i++){
             waveforms[2][i] = waveforms[2][512 + i] = sineTable[i];
         }
 
         // 4th: first and third quarter of double positive sinusoid.
-        for (var i = 0; i < 256; i++){
+        for (i = 0; i < 256; i++){
             waveforms[3][i] = waveforms[3][512 + i] = sineTable[i];
             waveforms[3][256 + i] = waveforms[3][768 + i] = 0;
         }
 
         // 5th: first half with double frequency sinusoid.
-        for (var i = 0; i < 512; i++){
+        for (i = 0; i < 512; i++){
             waveforms[4][i] = sineTable[i * 2];
             waveforms[4][512 + i] = 0;
         }
 
         // 6th: first half with double frequency positive sinusoid.
-        for (var i = 0; i < 256; i++){
+        for (i = 0; i < 256; i++){
             waveforms[5][i] = waveforms[5][256 + i] = sineTable[i * 2];
             waveforms[5][512 + i] = waveforms[5][768 + i] = 0;
         }
 
         // 7th: square wave
-        for (var i = 0; i < 512; i++){
+        for (i = 0; i < 512; i++){
             waveforms[6][i] = 1;
             waveforms[6][512 + i] = -1;
         }
 
         // 8th: exponential
-        for (var i = 0, x = 0; i < 512; i++, x += (16 / 256)) {
+        for (i = 0, x = 0; i < 512; i++, x += (16 / 256)) {
             waveforms[7][i] = Math.pow(2, -x);
             waveforms[7][1023 - i] = -Math.pow(2, -(x + 1 / 16));
         }
@@ -10841,7 +10746,7 @@ var EnvelopeGeneratorData = {
     ]
 };
 
-},{"extend":20,"util":46}],11:[function(_dereq_,module,exports){
+},{"extend":18,"util":46}],9:[function(_dereq_,module,exports){
 (function (process,Buffer){
 var Readable = _dereq_('stream').Readable;
 var util = _dereq_('util');
@@ -10849,8 +10754,7 @@ var WritableStreamBuffer = _dereq_('stream-buffers').WritableStreamBuffer;
 _dereq_('setimmediate');
 
 var OPL3 = _dereq_('./opl3');
-var Normalizer = _dereq_('./normalizer');
-var ConvertTo32Bit = _dereq_('./convertto32bit');
+var Normalizer = _dereq_('pcm-normalizer');
 
 var currentScriptSrc = null;
 try{
@@ -10948,8 +10852,6 @@ function Player(format, options){
                     aborted = true;
                 };
                 
-                var len = 0;
-                var dlen = 0;
                 var samplesBuffer = null;
                 var bufferType = options.bitDepth == 32 ? Float32Array : Int16Array;
                 if (options.bufferSize){
@@ -10966,15 +10868,12 @@ function Player(format, options){
                         var d = player.refresh();
                         var n = 4 * ((sampleRate * d) | 0);
 
-                        len += n;
-                        dlen += d;
-
                         self.emit('progress', Math.floor(player.position / player.data.byteLength * 1000) / 10);
 
                         var chunkSize = (n / 2) | 0;
                         if (options.bufferSize){
                             while(chunkSize > 0){
-                                samplesSize = Math.min(options.bufferSize * 2, chunkSize);
+                                var samplesSize = Math.min(options.bufferSize * 2, chunkSize);
                                 chunkSize -= samplesSize;
 
                                 player.opl.read(samplesBuffer);
@@ -11098,7 +10997,6 @@ function Player(format, options){
 
     if (!options.disableWorker && process.browser && typeof window != 'undefined' && 'Worker' in window){
         try{
-            var self = this;
             this.load = function(buffer, callback, postMessage){
                 initPostMessage(postMessage);
 
@@ -11160,7 +11058,7 @@ function Player(format, options){
 util.inherits(Player, Readable);
 module.exports = Player;
 }).call(this,_dereq_('_process'),_dereq_("buffer").Buffer)
-},{"./convertto32bit":8,"./normalizer":9,"./opl3":10,"_process":25,"buffer":15,"setimmediate":26,"stream":27,"stream-buffers":41,"util":46}],12:[function(_dereq_,module,exports){
+},{"./opl3":8,"_process":25,"buffer":13,"pcm-normalizer":23,"setimmediate":26,"stream":27,"stream-buffers":41,"util":46}],10:[function(_dereq_,module,exports){
 'use strict'
 
 exports.toByteArray = toByteArray
@@ -11271,9 +11169,9 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],13:[function(_dereq_,module,exports){
+},{}],11:[function(_dereq_,module,exports){
 
-},{}],14:[function(_dereq_,module,exports){
+},{}],12:[function(_dereq_,module,exports){
 (function (global){
 'use strict';
 
@@ -11385,7 +11283,7 @@ exports.allocUnsafeSlow = function allocUnsafeSlow(size) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"buffer":15}],15:[function(_dereq_,module,exports){
+},{"buffer":13}],13:[function(_dereq_,module,exports){
 (function (global){
 /*!
  * The buffer module from node.js, for the browser.
@@ -11641,7 +11539,9 @@ function fromArrayBuffer (that, array, byteOffset, length) {
     throw new RangeError('\'length\' is out of bounds')
   }
 
-  if (length === undefined) {
+  if (byteOffset === undefined && length === undefined) {
+    array = new Uint8Array(array)
+  } else if (length === undefined) {
     array = new Uint8Array(array, byteOffset)
   } else {
     array = new Uint8Array(array, byteOffset, length)
@@ -13100,14 +13000,14 @@ function isnan (val) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"base64-js":12,"ieee754":21,"isarray":16}],16:[function(_dereq_,module,exports){
+},{"base64-js":10,"ieee754":19,"isarray":14}],14:[function(_dereq_,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],17:[function(_dereq_,module,exports){
+},{}],15:[function(_dereq_,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -13218,7 +13118,7 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":_dereq_("../../is-buffer/index.js")})
-},{"../../is-buffer/index.js":23}],18:[function(_dereq_,module,exports){
+},{"../../is-buffer/index.js":21}],16:[function(_dereq_,module,exports){
 DataView.prototype.getString = function(offset, length){
     var end = typeof length == 'number' ? offset + length : this.byteLength;
     var text = '';
@@ -13232,7 +13132,7 @@ DataView.prototype.getString = function(offset, length){
 
     return text;
 };
-},{}],19:[function(_dereq_,module,exports){
+},{}],17:[function(_dereq_,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -13536,7 +13436,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],20:[function(_dereq_,module,exports){
+},{}],18:[function(_dereq_,module,exports){
 'use strict';
 
 var hasOwn = Object.prototype.hasOwnProperty;
@@ -13624,7 +13524,7 @@ module.exports = function extend() {
 };
 
 
-},{}],21:[function(_dereq_,module,exports){
+},{}],19:[function(_dereq_,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -13710,7 +13610,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],22:[function(_dereq_,module,exports){
+},{}],20:[function(_dereq_,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -13735,7 +13635,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],23:[function(_dereq_,module,exports){
+},{}],21:[function(_dereq_,module,exports){
 /**
  * Determine if an object is Buffer
  *
@@ -13754,7 +13654,124 @@ module.exports = function (obj) {
     ))
 }
 
-},{}],24:[function(_dereq_,module,exports){
+},{}],22:[function(_dereq_,module,exports){
+(function (Buffer){
+var Transform = _dereq_('stream').Transform;
+var util = _dereq_('util');
+
+function From16To32Bit(){
+    Transform.call(this);
+}
+
+From16To32Bit.prototype._transform = function(chunk, encoding, done){
+    var b32 = new Float32Array(chunk.byteLength / 2);
+    var dv = new DataView(chunk.buffer);
+    for (var i = 0, offset = 0; offset < chunk.byteLength; i++, offset += 2){
+        var v = dv.getInt16(offset, true);
+        b32[i] = v > 0 ? v / 32767 : v / 32768;
+    }
+    done(null, new Buffer(b32.buffer));
+};
+
+util.inherits(From16To32Bit, Transform);
+module.exports.From16To32Bit = From16To32Bit;
+
+function From32To16Bit(){
+    Transform.call(this);
+}
+
+From32To16Bit.prototype._transform = function(chunk, encoding, done){
+    var b16 = new Int16Array(chunk.byteLength / 4);
+    var dv = new DataView(chunk.buffer);
+    for (var i = 0, offset = 0; offset < chunk.byteLength; i++, offset += 4){
+        var v = dv.getFloat32(offset, true);
+        b16[i] = v > 0 ? v * 32767 : v * 32768;
+    }
+    done(null, new Buffer(b16.buffer));
+};
+
+util.inherits(From32To16Bit, Transform);
+module.exports.From32To16Bit = From32To16Bit;
+}).call(this,_dereq_("buffer").Buffer)
+},{"buffer":13,"stream":27,"util":46}],23:[function(_dereq_,module,exports){
+var Transform = _dereq_('stream').Transform;
+var WritableStreamBuffer = _dereq_('stream-buffers').WritableStreamBuffer;
+var util = _dereq_('util');
+
+function Normalizer(bitDepth){
+    if (typeof bitDepth != 'undefined' && !(bitDepth == 16 || bitDepth == 32)) throw new Error('Unsupported bit depth');
+
+    Transform.call(this);
+    var self = this;
+
+    var WritableStreamBuffer = _dereq_('stream-buffers').WritableStreamBuffer;
+    var writer = new WritableStreamBuffer({
+        initialSize: (1024 * 1024),
+        incrementAmount: (512 * 1024)
+    });
+
+    var peak = 0;
+    var scale = 1;
+    var targetPeak = (bitDepth == 32 ? 1 : 32767);
+    var len = 0;
+
+    var bps = (bitDepth == 32 ? 4 : 2);
+    var getter = (bitDepth == 32 ? DataView.prototype.getFloat32 : DataView.prototype.getInt16);
+    var setter = (bitDepth == 32 ? DataView.prototype.setFloat32 : DataView.prototype.setInt16);
+
+    this._transform = function(chunk, encoding, done){
+        var dv = new DataView(chunk.buffer);
+        len += chunk.byteLength / bps;
+
+        for (var i = 0; i < chunk.byteLength; i += bps){
+            var p = Math.abs(getter.call(dv, i, true));
+            if (p > peak) peak = p;
+        }
+
+        writer.write(chunk);
+        done();
+    };
+
+    this._flush = function(done){
+        writer.end();
+        var pcmBuffer = writer.getContents();
+
+        var endFn = function(){
+            self.push(pcmBuffer);
+            done();
+        };
+
+        if (peak > 0){
+            scale = targetPeak / peak;
+            var dv = new DataView(pcmBuffer.buffer);
+
+            var i = 0;
+            var perc = 0;
+            var normPcm = function(){
+                var t = Date.now();
+
+                for (; i < pcmBuffer.byteLength; i += bps){
+                    setter.call(dv, i, Math.round(getter.call(dv, i, true) * scale), true);
+                    var p = Math.floor((i / pcmBuffer.byteLength) * 1000) / 10;
+                    if (p > perc){
+                        perc = p;
+                        self.emit('normalization', perc);
+                    }
+                    if (Date.now() - t > 1000) return setImmediate(normPcm);
+                }
+
+                self.emit('normalization', 100);
+                self.emit('gain', scale);
+                endFn();
+            };
+            normPcm();
+        }else endFn();
+    };
+}
+
+util.inherits(Normalizer, Transform);
+module.exports = Normalizer;
+},{"stream":27,"stream-buffers":41,"util":46}],24:[function(_dereq_,module,exports){
 (function (process){
 'use strict';
 
@@ -13854,7 +13871,7 @@ function drainQueue() {
     if (draining) {
         return;
     }
-    var timeout = cachedSetTimeout(cleanUpNextTick);
+    var timeout = cachedSetTimeout.call(null, cleanUpNextTick);
     draining = true;
 
     var len = queue.length;
@@ -13871,7 +13888,7 @@ function drainQueue() {
     }
     currentQueue = null;
     draining = false;
-    cachedClearTimeout(timeout);
+    cachedClearTimeout.call(null, timeout);
 }
 
 process.nextTick = function (fun) {
@@ -13883,7 +13900,7 @@ process.nextTick = function (fun) {
     }
     queue.push(new Item(fun, args));
     if (queue.length === 1 && !draining) {
-        cachedSetTimeout(drainQueue, 0);
+        cachedSetTimeout.call(null, drainQueue, 0);
     }
 };
 
@@ -14230,9 +14247,9 @@ Stream.prototype.pipe = function(dest, options) {
   return dest;
 };
 
-},{"events":19,"inherits":22,"readable-stream/duplex.js":29,"readable-stream/passthrough.js":35,"readable-stream/readable.js":36,"readable-stream/transform.js":37,"readable-stream/writable.js":38}],28:[function(_dereq_,module,exports){
-arguments[4][16][0].apply(exports,arguments)
-},{"dup":16}],29:[function(_dereq_,module,exports){
+},{"events":17,"inherits":20,"readable-stream/duplex.js":29,"readable-stream/passthrough.js":35,"readable-stream/readable.js":36,"readable-stream/transform.js":37,"readable-stream/writable.js":38}],28:[function(_dereq_,module,exports){
+arguments[4][14][0].apply(exports,arguments)
+},{"dup":14}],29:[function(_dereq_,module,exports){
 module.exports = _dereq_("./lib/_stream_duplex.js")
 
 },{"./lib/_stream_duplex.js":30}],30:[function(_dereq_,module,exports){
@@ -14311,7 +14328,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":32,"./_stream_writable":34,"core-util-is":17,"inherits":22,"process-nextick-args":24}],31:[function(_dereq_,module,exports){
+},{"./_stream_readable":32,"./_stream_writable":34,"core-util-is":15,"inherits":20,"process-nextick-args":24}],31:[function(_dereq_,module,exports){
 // a passthrough stream.
 // basically just the most minimal sort of Transform stream.
 // Every written chunk gets output as-is.
@@ -14338,7 +14355,7 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":33,"core-util-is":17,"inherits":22}],32:[function(_dereq_,module,exports){
+},{"./_stream_transform":33,"core-util-is":15,"inherits":20}],32:[function(_dereq_,module,exports){
 (function (process){
 'use strict';
 
@@ -15234,7 +15251,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,_dereq_('_process'))
-},{"./_stream_duplex":30,"_process":25,"buffer":15,"buffer-shims":14,"core-util-is":17,"events":19,"inherits":22,"isarray":28,"process-nextick-args":24,"string_decoder/":43,"util":13}],33:[function(_dereq_,module,exports){
+},{"./_stream_duplex":30,"_process":25,"buffer":13,"buffer-shims":12,"core-util-is":15,"events":17,"inherits":20,"isarray":28,"process-nextick-args":24,"string_decoder/":43,"util":11}],33:[function(_dereq_,module,exports){
 // a transform stream is a readable/writable stream where you do
 // something with the data.  Sometimes it's called a "filter",
 // but that's not a great name for it, since that implies a thing where
@@ -15415,7 +15432,7 @@ function done(stream, er) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":30,"core-util-is":17,"inherits":22}],34:[function(_dereq_,module,exports){
+},{"./_stream_duplex":30,"core-util-is":15,"inherits":20}],34:[function(_dereq_,module,exports){
 (function (process){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
@@ -15944,7 +15961,7 @@ function CorkedRequest(state) {
   };
 }
 }).call(this,_dereq_('_process'))
-},{"./_stream_duplex":30,"_process":25,"buffer":15,"buffer-shims":14,"core-util-is":17,"events":19,"inherits":22,"process-nextick-args":24,"util-deprecate":44}],35:[function(_dereq_,module,exports){
+},{"./_stream_duplex":30,"_process":25,"buffer":13,"buffer-shims":12,"core-util-is":15,"events":17,"inherits":20,"process-nextick-args":24,"util-deprecate":44}],35:[function(_dereq_,module,exports){
 module.exports = _dereq_("./lib/_stream_passthrough.js")
 
 },{"./lib/_stream_passthrough.js":31}],36:[function(_dereq_,module,exports){
@@ -16089,7 +16106,7 @@ var ReadableStreamBuffer = module.exports = function(opts) {
 util.inherits(ReadableStreamBuffer, stream.Readable);
 
 }).call(this,_dereq_("buffer").Buffer)
-},{"./constants":39,"buffer":15,"stream":27,"util":46}],41:[function(_dereq_,module,exports){
+},{"./constants":39,"buffer":13,"stream":27,"util":46}],41:[function(_dereq_,module,exports){
 'use strict';
 
 module.exports = _dereq_('./constants');
@@ -16172,7 +16189,7 @@ var WritableStreamBuffer = module.exports = function(opts) {
 util.inherits(WritableStreamBuffer, stream.Writable);
 
 }).call(this,_dereq_("buffer").Buffer)
-},{"./constants":39,"buffer":15,"stream":27,"util":46}],43:[function(_dereq_,module,exports){
+},{"./constants":39,"buffer":13,"stream":27,"util":46}],43:[function(_dereq_,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -16395,7 +16412,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":15}],44:[function(_dereq_,module,exports){
+},{"buffer":13}],44:[function(_dereq_,module,exports){
 (function (global){
 
 /**
@@ -17063,7 +17080,7 @@ function hasOwnProperty(obj, prop) {
 }
 
 }).call(this,_dereq_('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./support/isBuffer":45,"_process":25,"inherits":22}],47:[function(_dereq_,module,exports){
+},{"./support/isBuffer":45,"_process":25,"inherits":20}],47:[function(_dereq_,module,exports){
 _dereq_('dataview-getstring');
 
 function VoiceData(data){
@@ -17110,7 +17127,7 @@ function GENMIDI(lump){
 }
 
 module.exports = GENMIDI;
-},{"dataview-getstring":18}],48:[function(_dereq_,module,exports){
+},{"dataview-getstring":16}],48:[function(_dereq_,module,exports){
 (function (Buffer){
 var markers = {
     RIFF: new Buffer('RIFF'),
@@ -17154,5 +17171,5 @@ function WAV(data, options){
 
 module.exports = WAV;
 }).call(this,_dereq_("buffer").Buffer)
-},{"buffer":15}]},{},[7])(7)
+},{"buffer":13}]},{},[7])(7)
 });

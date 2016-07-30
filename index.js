@@ -8,7 +8,7 @@ module.exports = {
         RAW: require('./format/raw')
     },
     WAV: require('wav-arraybuffer'),
-    ConvertTo32Bit: require('./lib/convertto32bit'),
-    Normalizer: require('./lib/normalizer'),
+    ConvertTo32Bit: require('pcm-bitdepth-converter').From16To32Bit,
+    Normalizer: require('pcm-normalizer'),
     Player: require('./lib/player')
 };

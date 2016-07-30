@@ -13,12 +13,11 @@ var numeral = require('numeral');
 
 try{ var lame = require('lame'); }catch(err){}
 try{ var ogg = require('ogg'); }catch(err){}
-try{ var vorbis = require('./utils/vorbis-encoder'); }catch(err){}
+try{ var vorbis = require('vorbis'); }catch(err){}
 try{ var Speaker = require('speaker'); }catch(err){}
 
 var opl3 = require('./index');
 
-var OPL3 = opl3.OPL3;
 var Player = opl3.Player;
 var LAA = opl3.format.LAA;
 var MUS = opl3.format.MUS;
@@ -33,7 +32,7 @@ var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u
 
 if (typeof lame != 'undefined') argv = argv.describe('mp3', 'Export to MP3');
 argv = argv.describe('wav', 'Export to WAV');
-	
+
 if (typeof ogg != 'undefined' && typeof vorbis != 'undefined') argv = argv.describe('ogg', 'Export to OGG');
 
 argv = argv.describe('mid', 'Export to MIDI')
@@ -90,39 +89,64 @@ else{
 	if (typeof Speaker == 'undefined') argv.play = false;
 	
 	var Midi = null;
-	if (argv.mid) Midi = require('jsmidgen'); 
+	if (argv.mid) Midi = require('jsmidgen');
 	
+	var deleteTempFiles = false;
 	glob(argv._[0], function(err, files){
+		if (err) throw err;
+
 		if (files.length < 1){
 			console.log(chalk.red('Input file not found!'));
 			process.exit(1);
 		}
+
+		var clearTempFiles = function(callback){
+			if (deleteTempFiles){
+				var tasks = [];
+
+				files.forEach(function(filename){
+					tasks.push(function(next){
+						var tmpFilename = path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp'));
+						fs.unlink(tmpFilename, next);
+					});
+
+					tasks.push(function(next){
+						var tmp32Filename = path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp32'));
+						fs.unlink(tmp32Filename, next);
+					});
+				});
+
+				async.parallel(tasks, callback);
+			}else callback();
+		};
 		
 		process.on('SIGINT', function(){
-			files.forEach(function(filename){
-				if (fs.existsSync(path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp')))) fs.unlinkSync(path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp')));
-				if (fs.existsSync(path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp32')))) fs.unlinkSync(path.join(argv.output || path.dirname(filename), path.basename(filename + '.tmp32')));
+			clearTempFiles(function(err){
+				if (err) throw err;
+				process.exit(1);
 			});
-			process.exit(1);
 		});
 
 		var genmidi = null;
-		if (argv.genmidi && fs.existsSync(argv.genmidi)){
-			console.log('Using GENMIDI lump', chalk.yellow(path.resolve(argv.genmidi)));
-			genmidi = fs.readFileSync(argv.genmidi);
+		var fileTasks = [];
+		if (argv.genmidi){
+			fileTasks.push(function(next){
+				console.log('Using GENMIDI lump', chalk.yellow(path.resolve(argv.genmidi)));
+				fs.readFile(argv.genmidi, function(err, buffer){
+					if (err) return next(err);
+
+					genmidi = buffer;
+					next();
+				});
+			});
 		}
 		
-		async.series(files.map(function(filename){
+		async.series(fileTasks.concat(files.map(function(filename){
 			var outputDir = argv.output || path.dirname(filename);
 			mkdirp.sync(outputDir);
 			filename = path.resolve(filename);
 			
 			return function(next){
-				if (!fs.existsSync(filename)){
-					console.log(chalk.red('Input file "' + filename + '" not found!'));
-					process.exit(1);
-				}
-				
 				var midiFormat;
 				if (argv.laa || filename.split('.').pop().toLowerCase() == 'laa') midiFormat = LAA;
 				else if (argv.mus || filename.split('.').pop().toLowerCase() == 'mus') midiFormat = MUS;
@@ -140,6 +164,8 @@ else{
 				var tasks = [];
 				tasks.push(function(callback){
 					fs.readFile(filename, function(err, buffer){
+						if (err) return next(err);
+
 						var bar = new ProgressBar('Processing ' + chalk.yellow(filename) + ' [:bar] :percent :etas', {
 							width: 20,
 							total: buffer.length
@@ -149,6 +175,7 @@ else{
 							Midi: Midi,
 							onlyMidi: argv.mid && !(argv.wav || argv.mp3 || argv.ogg || argv.play),
 							normalization: typeof argv.normalize == 'undefined' || argv.normalize,
+							sampleRate: 44100,
 							instruments: genmidi
 						});
 						var converter = new opl3.ConvertTo32Bit();
@@ -173,6 +200,8 @@ else{
 						}
 
 						player.load(buffer, function(err, result){
+							if (err) throw err;
+
 							if (result){
 								pcmBuffer = result;
 								len = result.byteLength;
@@ -205,7 +234,7 @@ else{
 				if (argv.mid){
 					tasks.push(function(callback){
 						if (midiBuffer){
-							var midiFilename = typeof argv.mid != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mid')) : argv.mid;
+							var midiFilename = typeof argv.mid == 'string' ? argv.mid : path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mid'));
 							mkdirp.sync(path.dirname(midiFilename));
 							midiFilename = path.resolve(midiFilename);
 					
@@ -220,11 +249,13 @@ else{
 				
 				if (argv.wav){
 					tasks.push(function(callback){
-						var wavFilename = typeof argv.wav != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.wav')) : argv.wav;
+						var wavFilename = typeof argv.wav == 'string' ? argv.wav : path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.wav'));
 						mkdirp.sync(path.dirname(wavFilename));
 						wavFilename = path.resolve(wavFilename);
 						
 						fs.writeFile(wavFilename, new Buffer(WAV(pcmBuffer, { sampleRate: 49700, bitDepth: 16 })), function(err){
+							if (err) throw err;
+
 							console.log('WAV exported to ' + chalk.yellow(wavFilename));
 							callback();
 						});
@@ -242,10 +273,10 @@ else{
 							// input
 							channels: 2,        // 2 channels (left and right)
 							bitDepth: 16,       // 16-bit samples
-							sampleRate: 49700,  // 49,700 Hz sample rate
+							sampleRate: 49700   // 49,700 Hz sample rate
 						});
 						
-						var mp3Filename = typeof argv.mp3 != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mp3')) : argv.mp3;
+						var mp3Filename = typeof argv.mp3 == 'string' ? argv.mp3 : path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mp3'));
 						mkdirp.sync(path.dirname(mp3Filename));
 						mp3Filename = path.resolve(mp3Filename);
 						
@@ -283,7 +314,7 @@ else{
 							sampleRate: 49700
 						});
 						
-						var oggFilename = typeof argv.ogg != 'string' ? path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.ogg')) : argv.ogg;
+						var oggFilename = typeof argv.ogg == 'string' ? argv.ogg : path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.ogg'));
 						mkdirp.sync(path.dirname(oggFilename));
 						
 						var writer = fs.createWriteStream(oggFilename);
@@ -341,12 +372,12 @@ else{
 				}
 
 				async.series(tasks, function(err){
-					if (fs.existsSync(path.join(outputDir, path.basename(filename + '.tmp')))) fs.unlinkSync(path.join(outputDir, path.basename(filename + '.tmp')));
-					if (fs.existsSync(path.join(outputDir, path.basename(filename + '.tmp32')))) fs.unlinkSync(path.join(outputDir, path.basename(filename + '.tmp32')));
-					next(err);
+					if (err) return next(err);
+					clearTempFiles(next);
 				});
 			};
-		}), function(){
+		})), function(err){
+			if (err) console.log(chalk.red(err));
 			console.log('Finished in ' + chalk.green(new Duration(new Date(0), new Date(Date.now() - start)).toString(1)));
 		});
 	});
