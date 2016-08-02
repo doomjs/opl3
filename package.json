@@ -1,6 +1,6 @@
 {
   "name": "opl3",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "OPL3 emulator library",
   "main": "index.js",
   "preferGlobal": true,
@@ -59,6 +59,7 @@
   },
   "optionalDependencies": {
     "lame": "github:doomjs/node-lame",
+    "node-opus": "github:doomjs/node-opus",
     "ogg": "github:doomjs/node-ogg",
     "speaker": "github:doomjs/node-speaker",
     "vorbis": "github:doomjs/node-vorbis"

@@ -12,6 +12,7 @@ var glob = require('glob');
 var numeral = require('numeral');
 
 try{ var lame = require('lame'); }catch(err){}
+try{ var opus = require('node-opus'); }catch(err){}
 try{ var ogg = require('ogg'); }catch(err){}
 try{ var vorbis = require('vorbis'); }catch(err){}
 try{ var Speaker = require('speaker'); }catch(err){}
@@ -30,10 +31,12 @@ var package = require('./package.json');
 var argv = yargs.usage(chalk.cyan('\nOPL3 emulator v' + package.version) + '\n\u001b[97mUsage:\u001b[39m\u001b[49m opl3 <input file> [OPTIONS]')
 	.example('opl3 D_E1M1.mus');
 
-if (typeof lame != 'undefined') argv = argv.describe('mp3', 'Export to MP3');
+if (typeof lame != 'undefined') argv = argv.describe('mp3', 'Export to MP3/Lame');
 argv = argv.describe('wav', 'Export to WAV');
 
-if (typeof ogg != 'undefined' && typeof vorbis != 'undefined') argv = argv.describe('ogg', 'Export to OGG');
+if (typeof ogg != 'undefined' && typeof vorbis != 'undefined') argv = argv.describe('ogg', 'Export to OGG/Vorbis');
+
+if (typeof opus != 'undefined') argv = argv.describe('opus', 'Export to OGG/Opus');
 
 argv = argv.describe('mid', 'Export to MIDI')
 	.describe('laa', 'Use LAA format')
@@ -77,21 +80,23 @@ else{
 	
 	if (typeof argv.normalize == 'undefined') argv.normalize = 1;
 	
-	if (!(argv.wav || argv.mp3 || argv.ogg || argv.mid || argv.play)){
+	if (!(argv.wav || argv.mp3 || argv.ogg || argv.opus || argv.mid || argv.play)){
 		argv.wav = true;
 		argv.mp3 = true;
 		argv.ogg = true;
+		argv.opus = true;
 		argv.mid = true;
 	}
 
 	if (typeof lame == 'undefined') argv.mp3 = false;
 	if (typeof ogg == 'undefined' || typeof vorbis == 'undefined') argv.ogg = false;
+	if (typeof opus == 'undefined') argv.opus = false;
 	if (typeof Speaker == 'undefined') argv.play = false;
 	
 	var Midi = null;
 	if (argv.mid) Midi = require('jsmidgen');
 	
-	var deleteTempFiles = false;
+	var deleteTempFiles = true;
 	glob(argv._[0], function(err, files){
 		if (err) throw err;
 
@@ -173,9 +178,9 @@ else{
 
 						var player = new Player(midiFormat, {
 							Midi: Midi,
-							onlyMidi: argv.mid && !(argv.wav || argv.mp3 || argv.ogg || argv.play),
+							onlyMidi: argv.mid && !(argv.wav || argv.mp3 || argv.ogg || argv.opus || argv.play),
 							normalization: typeof argv.normalize == 'undefined' || argv.normalize,
-							sampleRate: 44100,
+							sampleRate: 48000,
 							instruments: genmidi
 						});
 						var converter = new opl3.ConvertTo32Bit();
@@ -186,14 +191,14 @@ else{
 							var normbar;
 							player.normalizer.pipe(tmpWriter);
 
-							if (argv.ogg){
+							if (argv.ogg || argv.opus){
 								player.normalizer.pipe(converter);
 								converter.pipe(tmp32Writer);
 							}
 						}else{
 							player.pipe(tmpWriter);
 
-							if (argv.ogg){
+							if (argv.ogg || argv.opus){
 								player.pipe(converter);
 								converter.pipe(tmp32Writer);
 							}
@@ -253,7 +258,7 @@ else{
 						mkdirp.sync(path.dirname(wavFilename));
 						wavFilename = path.resolve(wavFilename);
 						
-						fs.writeFile(wavFilename, new Buffer(WAV(pcmBuffer, { sampleRate: 49700, bitDepth: 16 })), function(err){
+						fs.writeFile(wavFilename, new Buffer(WAV(pcmBuffer, { sampleRate: 48000, bitDepth: 16 })), function(err){
 							if (err) throw err;
 
 							console.log('WAV exported to ' + chalk.yellow(wavFilename));
@@ -273,7 +278,7 @@ else{
 							// input
 							channels: 2,        // 2 channels (left and right)
 							bitDepth: 16,       // 16-bit samples
-							sampleRate: 49700   // 49,700 Hz sample rate
+							sampleRate: 48000   // 48,000 Hz sample rate
 						});
 						
 						var mp3Filename = typeof argv.mp3 == 'string' ? argv.mp3 : path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.mp3'));
@@ -311,7 +316,7 @@ else{
 						
 						var oe = new ogg.Encoder();
 						var ve = new vorbis.Encoder({
-							sampleRate: 49700
+							sampleRate: 48000
 						});
 						
 						var oggFilename = typeof argv.ogg == 'string' ? argv.ogg : path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.ogg'));
@@ -338,6 +343,41 @@ else{
 						});
 					});
 				}
+
+				if (argv.opus){
+					tasks.push(function(callback){
+						var bar = new ProgressBar('Encoding ' + chalk.yellow(filename) + ' to OGG/Opus [:bar] :percent :etas', {
+							width: 20,
+							total: 100
+						});
+						
+						var oe = new ogg.Encoder();
+						var pe = new opus.Encoder(48000, 2);
+						
+						var opusFilename = typeof argv.opus == 'string' ? argv.opus : path.join(outputDir, path.basename(filename.slice(0, filename.lastIndexOf('.')) + '.opus'));
+						mkdirp.sync(path.dirname(opusFilename));
+						
+						var writer = fs.createWriteStream(opusFilename);
+						var reader = fs.createReadStream(path.join(outputDir, path.basename(filename + '.tmp')));
+						
+						reader.pipe(pe);
+						pe.pipe(oe.stream());
+						oe.pipe(writer);
+						
+						var pos = 0;
+						reader.on('data', function(chunk){
+							pos += chunk.length;
+							bar.update(pos / len);
+						});
+						reader.on('end', function(){
+							callback();
+						});
+						reader.on('error', function(err){
+							console.log(chalk.red('Failed to export ' + opusFilename));
+							callback(err);
+						});
+					});
+				}
 				
 				if (argv.play){
 					tasks.push(function(callback){
@@ -349,7 +389,7 @@ else{
 						var speaker = new Speaker({
 							channels: 2,          // 2 channels
 							bitDepth: 16,         // 16-bit samples
-							sampleRate: 49700     // 49,700 Hz sample rate
+							sampleRate: 48000     // 48,000 Hz sample rate
 						});
 						
 						var reader = fs.createReadStream(path.join(outputDir, path.basename(filename + '.tmp')));

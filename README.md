@@ -9,13 +9,14 @@ Ported from [Yamaha YMF262 (OPL3) Emulator by Robson Cozendey](http://opl3.cozen
 Install OPL3 emulator as ```npm install -g opl3```.
 
 ```
-OPL3 emulator v0.4.1
+OPL3 emulator v0.4.2
 Usage: opl3 <input file> [OPTIONS]
 
 Options:
-  --mp3            Export to MP3
+  --mp3            Export to MP3/Lame
   --wav            Export to WAV
-  --ogg            Export to OGG
+  --ogg            Export to OGG/Vorbis
+  --opus           Export to OGG/Opus
   --mid            Export to MIDI
   --laa            Use LAA format
   --mus            Use MUS format
@@ -241,8 +242,9 @@ new OPL3.Player(OPL3.format.MUS, {
 ## Supported audio export formats
 
 * WAV: PCM audio WAVE
-* MP3: using [node-lame](https://github.com/TooTallNate/node-lame)
-* OGG: using [node-vorbis](https://github.com/TooTallNate/node-vorbis) and [node-ogg](https://github.com/TooTallNate/node-ogg)
+* MP3/Lame: using [node-lame](https://github.com/TooTallNate/node-lame)
+* OGG/Vorbis: using [node-vorbis](https://github.com/TooTallNate/node-vorbis) and [node-ogg](https://github.com/TooTallNate/node-ogg)
+* OGG/Opus: using [node-opus](https://github.com/Rantanen/node-opus) and [node-ogg](https://github.com/TooTallNate/node-ogg)
 * MIDI: currently only supported by MUS file format handler
 * Audio playback: using [node-speaker](https://github.com/TooTallNate/node-speaker) in node.js and Web Audio API in browser.
 
